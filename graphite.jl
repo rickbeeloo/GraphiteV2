@@ -37,6 +37,7 @@ function update_color!(color::Color, ref_id::Int32, match_start::Int32, match_si
         match_size_nt = sum(get.(Ref(color.size_map), view(ca, match_start:match_end), 0))
         # We have to consider to overlap between k-mers as well 
         match_size_nt = match_size_nt - ((match_size-1) * (color.k_size-1)) 
+        if match_size_nt < 0 && println("Size cannot be negative")
         for i in match_start:match_end
             if color.len[i] < match_size_nt 
                 color.len[i]  = match_size_nt
