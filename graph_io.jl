@@ -54,7 +54,7 @@ function writeResults(ca::Vector{Int32}, color::Color, query_ids::OrderedSet{Str
         j +=1
         if ca[i] < 0 
             q_count +=1
-            genome_loc = 0
+            genome_loc = 1
             prev_ori = Origin(-1,-1)
 
         elseif prev_ori.id != color.origin[i].id || prev_ori.pos != color.origin[i].pos 
