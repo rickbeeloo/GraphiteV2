@@ -59,7 +59,7 @@ function writeResults(ca::Vector{Int32}, color::Color, query_ids::OrderedSet{Str
 
         elseif prev_ori.id != color.origin[i].id || prev_ori.pos != color.origin[i].pos 
             if i > 1 && color.len[i-1] > 0
-                println(h, query_ids[q_count], "\t", color.origin[i-1].id, "\t", aln_start, "\t", genome_loc, "\t", color.len[i-1])
+                println(h, query_ids[q_count], "\t", color.origin[i-1].id, "\t", aln_start, "\t", genome_loc+(color.k_size - 1), "\t", color.len[i-1])
             end
             node_size = size_map[ca[i]]
             aln_start = copy(genome_loc)
