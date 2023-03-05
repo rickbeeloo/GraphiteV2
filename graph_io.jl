@@ -62,6 +62,7 @@ function writeResults(ca::Vector{Int32}, color::Color, query_ids::OrderedSet{Str
             # We should end the current alignment here 
             aln_start = copy(genome_loc)
             println(h, query_ids[q_count], "\t", color.origin[i].id, "\t", aln_start, "\t", genome_loc+(color.k_size), "\t", color.len[i])
+            prev_ori = color.origin[i+1]
         end
 
         if ca[i] < 0
