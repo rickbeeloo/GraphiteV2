@@ -51,9 +51,10 @@ function writeResults(ca::Vector{Int32}, color::Color, query_ids::OrderedSet{Str
 
     j = 0
     for i in 1:length(color.len) 
+        i == 1 && println(color.origin[i])
         j +=1
         if ca[i] < 0 
-            i > 1 && println(h, query_ids[q_count-1], "\t", color.origin[j-1].id, "\t", aln_start, "\t", genome_loc, "\t", color.len[j-1])
+            i > 1 && println(h, query_ids[q_count], "\t", color.origin[j-1].id, "\t", aln_start, "\t", genome_loc, "\t", color.len[j-1])
             q_count +=1
             genome_loc = 0
             prev_ori = Origin(-1,-1)
@@ -64,11 +65,11 @@ function writeResults(ca::Vector{Int32}, color::Color, query_ids::OrderedSet{Str
             end
             node_size = size_map[ca[i]]
             aln_start = copy(genome_loc)
-            genome_loc += genome_loc == 1 ? node_size : node_size - (color.k_size - 1)
+            genome_loc +=  node_size - (color.k_size - 1)  # genome_loc == 1 ? node_size :
             prev_ori = color.origin[i]
         else 
             node_size = size_map[ca[i]]
-            genome_loc += genome_loc == 1 ? node_size : node_size - (color.k_size - 1)
+            genome_loc +=  node_size - (color.k_size - 1)
         end 
     end
     # Do the last one
