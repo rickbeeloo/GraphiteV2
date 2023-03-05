@@ -46,7 +46,7 @@ function writeResults(ca::Vector{Int32}, color::Color, query_ids::OrderedSet{Str
     h = open(out_file, "w+")
     prev_ori = Origin(-1,-1)
     aln_start = 1
-    genome_loc = 1
+    genome_loc = 0
     q_count = 1
 
     j = 0
