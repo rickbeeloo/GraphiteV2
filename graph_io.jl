@@ -44,7 +44,7 @@ end
 
 function writeResults(ca::Vector{Int32}, color::Color, query_ids::OrderedSet{String}, out_file::String, size_map::Dict{Int32, Int32})
     h = open(out_file, "w+")
-    prev_ori = Origin(-1,-1)
+    prev_ori =  color.origin[i]
     aln_start = 1
     genome_loc = 1
     q_count = 1
@@ -61,13 +61,13 @@ function writeResults(ca::Vector{Int32}, color::Color, query_ids::OrderedSet{Str
         if ca[i+1] < 0 || prev_ori.id != color.origin[i+1].id || prev_ori.pos != color.origin[i+1].pos
             # We should end the current alignment here 
             aln_start = copy(genome_loc)
-            println(h, query_ids[q_count], "\t", color.origin[i].id, "\t", aln_start, "\t", genome_loc+(color.k_size), "\t", color.len[i])
+            println(h, query_ids[q_count], "\t", color.origin[i].id, "\t", aln_start, "\t", genome_loc+color.k_size, "\t", color.len[i])
             prev_ori = color.origin[i+1]
         end
 
         if ca[i] < 0
             q_count +=1 
-            prev_ori = Origin(-1,-1)
+            prev_ori = color.origin[i+1]
             genome_loc = 1
         end 
 
