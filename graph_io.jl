@@ -47,30 +47,30 @@ function writeResults(ca::Vector{Int32}, color::Color, query_ids::OrderedSet{Str
     prev_ori = Origin(-1,-1)
     aln_start = 1
     genome_loc = 1
-    q_count = 0
+    q_count = 1
 
     
-    for i in 1:length(color.len) 
+    for i in 1:length(color.len)-1 
+            
         
-        # We reach the end of an alginment when: 
-        # - the next ca[i] < 0 = query switch in the SA
-        # - reach the end of the color array (caught by iterting -1)
-        # - color or position changes 
-        if ca[i+1] < 0 || prev_ori.id != color.origin[i+1].id || prev_ori.pos != color.origin[i+1].pos
-            # We should end the current alignment here 
-            aln_end = genome_loc + color.k_size
-            aln_start = copy(genome_loc)
-            println(h, query_ids[q_count], "\t", color.origin[i-1].id, "\t", aln_start, "\t", genome_loc+(color.k_size), "\t", color.len[i-1])
-        end
-        
-        if ca[i] < 0 
-            q_count +=1 
-            prev_ori = Origin(-1,-1)
-            genome_loc = 1
-        else 
+        if ca[i] > 0 
             node_size = size_map[ca[i]]
             genome_loc +=  node_size - color.k_size - 2
         end
+
+        if ca[i+1] < 0 || prev_ori.id != color.origin[i+1].id || prev_ori.pos != color.origin[i+1].pos
+            # We should end the current alignment here 
+            aln_start = copy(genome_loc)
+            println(h, query_ids[q_count], "\t", color.origin[i].id, "\t", aln_start, "\t", genome_loc+(color.k_size), "\t", color.len[i])
+        end
+
+        if ca[i] < 0
+            q_count +=1 
+            prev_ori = Origin(-1,-1)
+            genome_loc = 1
+        end 
+
+    end
         
 
 end
