@@ -44,31 +44,32 @@ end
 
 function writeResults(ca::Vector{Int32}, color::Color, query_ids::OrderedSet{String}, out_file::String, size_map::Dict{Int32, Int32})
     h = open(out_file, "w+")
-    prev_ori =  color.origin[i]
+    prev_ori =  color.origin[1]
     aln_start = 1
-    genome_loc = 1
+    genome_loc = 0
     q_count = 1
-
-    
-    for i in 1:length(color.len)-1 
+   
+    for i in 1:length(color.len)-1
             
-        
+        println(i, " -> ", genome_loc, " origin: ", color.origin[i], " node size: ", size_map[ca[i]], " node was: ", ca[i])
         if ca[i] > 0 
             node_size = size_map[ca[i]]
-            genome_loc +=  node_size - color.k_size - 2
+            genome_loc += node_size - color.k_size + 1
         end
 
         if ca[i+1] < 0 || prev_ori.id != color.origin[i+1].id || prev_ori.pos != color.origin[i+1].pos
+           # println("here: ", color.len[i])
             # We should end the current alignment here 
-            aln_start = copy(genome_loc)
-            println(h, query_ids[q_count], "\t", color.origin[i].id, "\t", aln_start, "\t", genome_loc+color.k_size, "\t", color.len[i])
+            color.len[i] > 0 && println(h, query_ids[q_count], "\t", color.origin[i].id, "\t", aln_start, "\t", genome_loc+color.k_size-1, "\t", color.len[i])
             prev_ori = color.origin[i+1]
+            aln_start = copy(genome_loc) + 1 
         end
 
         if ca[i] < 0
+            println("Switcho")
             q_count +=1 
             prev_ori = color.origin[i+1]
-            genome_loc = 1
+            genome_loc = 0
         end 
 
     end
