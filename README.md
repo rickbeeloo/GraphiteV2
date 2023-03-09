@@ -9,6 +9,7 @@ Clone the repo
 This already includes `libasais` but can then only be used from within the `GraphiteV2` folder. 
 
 To call `Graphite`, use:
+
 `julia main.jl -g test_data/phage_graph.cf_seq -s test_data/phage_graph.cf_seg -k 31 -o test_data/output.txt -q test_data/query.txt`
 
 - `-g`,  the graph path file, when constructed using Cuttlefish the `.cf_seq` file.
