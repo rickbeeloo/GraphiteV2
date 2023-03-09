@@ -28,26 +28,17 @@ function update_color!(color::Color, ref_id::Int32, match_start::Int32, match_si
     at_start = color.origin[match_start]
     at_end   = color.origin[match_end]
 
-    match_start == 26 && println("Updating color: ", at_start.id, " ", at_end.id, " ", at_start.pos, " ", at_end.pos)
     if at_start.id > 0 && at_start.id == at_end.id && at_start.pos == at_end.pos
-        match_start == 26 && println("First return")
         return
     # Don't have to bother about single node matches as they can't be longer anyway
     elseif match_start ==  match_end && color.len[match_start] > 0
-        match_start == 26 && println("Second return")
         return
     else
-        match_start == 26 && println("Made it to fill")
         match_size_nt = sum(get.(Ref(color.size_map), view(ca, match_start:match_end), 0))
         # We have to consider to overlap between k-mers as well 
         match_size_nt = match_size_nt - ((match_size-1) * (color.k_size-1)) 
-        match_start == 26 && println("Match size filling: ", match_size_nt)
-        match_size_nt < 0 && println("Size cannot be negative")
-        match_start == 26 && println("R: ", match_start:match_end)
         for i in match_start:match_end
-            match_start == 26 && println(i)
             if color.len[i] < match_size_nt 
-                match_start == 26 && println("Replaced at: ", i)
                 color.len[i]  = match_size_nt
                 color.origin[i] = Origin(ref_id, match_start)
             end
@@ -119,20 +110,11 @@ function extend_from_point!(ca::Vector{Int32}, sa::Vector{Int32}, ref::Vector{In
 end
 
 function align(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}, ref::Vector{Int32}, inv_perm_sa::Vector{Int32}, lcp::Vector{Int32})
-    println(ref_id, " at: ", ref[307])
+   # println(ref_id, " at: ", ref[307])
     max_match_index = Int32(0)
     max_match_size = Int32(0)
     ref_start = Int32(1)
     while ref_start <= length(ref)
-        if ref[ref_start] == 1073747145
-            println(ref_start)
-            println("FOUND IN REF")
-        end
-
-
-        if ref[ref_start] == 5321
-            println("FOUND IN REF: ", 5321)
-        end
 
         # Do binary search to locate the insert point
         insert_point = locate_insert_point(sa, ca, view(ref, ref_start:length(ref)))
@@ -141,23 +123,8 @@ function align(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}
         # If we have a match keep using the linked list to extend 
         if max_match_size > 0 
             while ref_start <= length(ref)
-                if ref[ref_start] == 1073747145
-                    println("FOUND IN REF")
-                end
-
-                if ref[ref_start] == 5321
-                    println("FOUND IN REF: ", 5321)
-                end
-
-                # Check the match size at this point 
+                       # Check the match size at this point 
                 max_match_size = check_this_point(ca, sa, ref, ref_start, max_match_index, Int32(max_match_size-1)) # skip k-1
-
-                if ref[ref_start] == 5321
-                    println("Insert point: ", insert_point)
-                    println("FOUND IN REF: ", 5321)
-                    println("Match size: ", max_match_size, " at: ", max_match_index)
-                    println("At this loc we have: ", ca[sa[[max_match_index]]], " with: ", sa[[max_match_index]])
-                end
                 
                 # If we don't have any match we don't have to check the flanks
                 max_match_size == 0 && break 
@@ -180,10 +147,8 @@ end
 
 function align_forward_and_reverse(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}, ref::Vector{Int32}, inv_perm_sa::Vector{Int32}, lcp::Vector{Int32})
     # First do the forward align 
-    # convert_nodes!(ref)
     align(ref_id, color, ca, sa, ref, inv_perm_sa,lcp)
     # Flip the nodes and reverse to do the reverse alignment 
-    println("REVERSING")
     reverse_complement_ref!(ref)
     align(ref_id, color, ca, sa, ref, inv_perm_sa,lcp)
 end
@@ -209,10 +174,6 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
     end
 
     writeResults(ca, color, query_ids, out_file, size_map)
-    println(ca)
-    println(ca[26])
-    println(color.len[26])
-    println(color.origin[26])
 
 end
 
