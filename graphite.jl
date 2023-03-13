@@ -1,5 +1,3 @@
-
-
 const MASK = Int32(1<<30) 
 
 flipnode(n::Int32) = n ⊻ MASK
@@ -153,28 +151,32 @@ function align_forward_and_reverse(ref_id::Int32, color::Color, ca::Vector{Int32
     align(ref_id, color, ca, sa, ref, inv_perm_sa,lcp)
 end
 
-function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, out_file::String) 
-    queries, query_ids = processGFA(gfa, query_file)
+function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, out_file::String; blacklist::String = "") 
     
+    blacklist_ids = !isempty(blacklist) ? read_ids_from_file(blacklist) : OrderedSet{String}()
+
+    queries, query_ids = processGFA(gfa, query_file)
+       
     ca, sa = create_k_suffix_array(queries, Int32(0))
     inv_sa_perm = inverse_perm_sa(sa)
     lcp = build_lcp(sa, ca)
 
+  
     size_map = read_node_sizes(seq_file)
     len = zeros(Int32, length(ca))
     ori =  [Origin(-1,-1) for i in 1:length(ca)] # Vector{Origin}(undef, length(ca)) 
     color = Color(len, ori, size_map, k_size)
 
     for (ref_id, line) in enumerate(eachline(gfa))
-        identifier, path = split(line, "\t")
-        if !(identifier in query_ids)
-            path_numbers = parse_numbers(path)
-            align_forward_and_reverse(Int32(ref_id), color, ca, sa, path_numbers, inv_sa_perm, lcp)
-        end
+       identifier, path = split(line, "\t")
+       if !(identifier in query_ids) && !(identifier in blacklist_ids)
+           path_numbers = parse_numbers(path)
+           align_forward_and_reverse(Int32(ref_id), color, ca, sa, path_numbers, inv_sa_perm, lcp)
+       end
     end
 
     writeResults(ca, color, query_ids, out_file, size_map)
 
 end
 
-
+# run("test", "test", "test", Int32(31), "test")

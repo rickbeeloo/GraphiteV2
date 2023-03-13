@@ -39,6 +39,11 @@ GRAPH MEM SEARCHER 2023
             help = "Output file path"
             required = true
             arg_type = String
+        "--blacklist", "-b"
+            help = "File with IDS not to align to"
+            required = false
+            arg_type = String
+
     end
     return parse_args(s)
 end
@@ -49,7 +54,11 @@ function main()
     for (arg, val) in parsed_args
         println("  $arg  =>  $val")
     end
-    run(parsed_args["gfa"], parsed_args["seq"], parsed_args["query_file"], Int32(parsed_args["k_size"]), parsed_args["out"])
+    if !haskey(parsed_args, "blacklist")
+        run(parsed_args["gfa"], parsed_args["seq"], parsed_args["query_file"], Int32(parsed_args["k_size"]), parsed_args["out"])
+    else 
+        run(parsed_args["gfa"], parsed_args["seq"], parsed_args["query_file"], Int32(parsed_args["k_size"]), parsed_args["out"], blacklist = parsed_args["blacklist"])
+    end
 end 
 
 main()
