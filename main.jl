@@ -54,7 +54,8 @@ function main()
     for (arg, val) in parsed_args
         println("  $arg  =>  $val")
     end
-    if !haskey(parsed_args, "blacklist")
+
+    if isnothing(parsed_args["blacklist"])
         run(parsed_args["gfa"], parsed_args["seq"], parsed_args["query_file"], Int32(parsed_args["k_size"]), parsed_args["out"])
     else 
         run(parsed_args["gfa"], parsed_args["seq"], parsed_args["query_file"], Int32(parsed_args["k_size"]), parsed_args["out"], blacklist = parsed_args["blacklist"])
