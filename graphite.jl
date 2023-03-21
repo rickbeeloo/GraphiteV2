@@ -1,3 +1,5 @@
+using ProgressMeter
+
 const MASK = Int32(1<<30) 
 
 flipnode(n::Int32) = n ⊻ MASK
@@ -167,7 +169,7 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
     ori =  [Origin(-1,-1) for i in 1:length(ca)] # Vector{Origin}(undef, length(ca)) 
     color = Color(len, ori, size_map, k_size)
 
-    for (ref_id, line) in enumerate(eachline(gfa))
+    @showpgress for (ref_id, line) in enumerate(eachline(gfa))
        identifier, path = split(line, "\t")
        if !(identifier in query_ids) && !(identifier in blacklist_ids)
            path_numbers = parse_numbers(path)
