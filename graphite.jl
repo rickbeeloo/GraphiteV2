@@ -174,11 +174,12 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
     ori =  [Origin(-1,-1) for i in 1:length(ca)] # Vector{Origin}(undef, length(ca)) 
     color = Color(len, ori, size_map, k_size)
 
-    p = Progress(1_000)
+    limit = 500
+    p = Progress(limit)
     println("Start aligning...")
     @profile for (ref_id, line) in enumerate(eachline(gfa))
        identifier, path = split(line, "\t")
-       if red_id == 1000
+       if red_id == limit
         break 
        end
        if !(identifier in query_ids) && !(identifier in blacklist_ids)
@@ -189,7 +190,7 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
     end
 
     writeResults(ca, color, query_ids, out_file, size_map)
-    
+
     save("test.jlprof",  Profile.retrieve()...)
 end
 
