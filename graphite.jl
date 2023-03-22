@@ -157,20 +157,24 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
     
     blacklist_ids = !isempty(blacklist) ? read_ids_from_file(blacklist) : OrderedSet{String}()
 
+    println("Reading queries")
     queries, query_ids = processGFA(gfa, query_file)
-       
+    
+    println("Creating suffix array")
     ca, sa = create_k_suffix_array(queries, Int32(0))
+    println("Creating inv perm")
     inv_sa_perm = inverse_perm_sa(sa)
+    println("Building LCP")
     lcp = build_lcp(sa, ca)
 
-  
+    println("Get node sizes")
     size_map = read_node_sizes(seq_file)
     len = zeros(Int32, length(ca))
     ori =  [Origin(-1,-1) for i in 1:length(ca)] # Vector{Origin}(undef, length(ca)) 
     color = Color(len, ori, size_map, k_size)
 
     p = Progress(1_000)
-
+    println("Start aligning...")
     for (ref_id, line) in enumerate(eachline(gfa))
        identifier, path = split(line, "\t")
        if red_id == 1000
