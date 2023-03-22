@@ -1,4 +1,5 @@
 using ProgressMeter
+using Profile, FileIO
 
 const MASK = Int32(1<<30) 
 
@@ -175,7 +176,7 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
 
     p = Progress(1_000)
     println("Start aligning...")
-    for (ref_id, line) in enumerate(eachline(gfa))
+    @profile for (ref_id, line) in enumerate(eachline(gfa))
        identifier, path = split(line, "\t")
        if red_id == 1000
         break 
@@ -188,7 +189,8 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
     end
 
     writeResults(ca, color, query_ids, out_file, size_map)
-
+    
+    save("test.jlprof",  Profile.retrieve()...)
 end
 
 # run("test", "test", "test", Int32(31), "test")
