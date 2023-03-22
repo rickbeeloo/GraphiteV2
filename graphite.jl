@@ -179,7 +179,7 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
     println("Start aligning...")
     @profile for (ref_id, line) in enumerate(eachline(gfa))
        identifier, path = split(line, "\t")
-       if red_id == limit
+       if ref_id == limit
         break 
        end
        if !(identifier in query_ids) && !(identifier in blacklist_ids)
