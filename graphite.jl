@@ -1,5 +1,7 @@
 using ProgressMeter
 using Profile, FileIO
+using OrderedCollections
+include("./suffixArray.jl")
 
 const MASK = Int32(1<<30) 
 
@@ -22,7 +24,6 @@ struct Color
 end
 
 function update_color!(color::Color, ref_id::Int32, match_start::Int32, match_size::Int32, ca::Vector{Int32})
-    return
     
     match_end = match_start+match_size-1
     
@@ -31,14 +32,18 @@ function update_color!(color::Color, ref_id::Int32, match_start::Int32, match_si
     at_end   = color.origin[match_end]
 
     if at_start.id > 0 && at_start.id == at_end.id && at_start.pos == at_end.pos
+        #println("COLOR_UPDATE: Max already")
         return
     # Don't have to bother about single node matches as they can't be longer anyway
     elseif match_start ==  match_end && color.len[match_start] > 0
+        #println("COLOR_UPDATE: Max already")
         return
     else
+        
         match_size_nt = sum(get.(Ref(color.size_map), view(ca, match_start:match_end), 0))
         # We have to consider to overlap between k-mers as well 
         match_size_nt = match_size_nt - ((match_size-1) * (color.k_size-1)) 
+        println("COLOR_UPDATE: Max already: ", match_size_nt)
         for i in match_start:match_end
             if color.len[i] < match_size_nt 
                 color.len[i]  = match_size_nt
@@ -90,6 +95,7 @@ function check_this_point(ca::Vector{Int32}, sa::Vector{Int32}, ref::AbstractVec
     # Given a point in the suffix array, compare the suffix to the Ref 
     ca_suffix_index = sa[point]
     ca_start = ca_suffix_index + skip
+    #println("Checking suffix: ", view(ref, ref_start:length(ref)))
     ref_start = ref_start + skip
     match_size = matches_till(ref, ref_start, ca, ca_start) + skip
     return match_size
@@ -105,7 +111,7 @@ function extend_from_point!(ca::Vector{Int32}, sa::Vector{Int32}, ref::Vector{In
         # check the previous match size so min(lcp valu, prev match size)
         start_check_from = Int32(min(lcp[i + lcp_dir], match_size))
         # Check the size of this match starting from +1 of the LCP value)
-        match_size = check_this_point(ca, sa, ref, ref_start, Int32(i), start_check_from )
+        match_size = check_this_point(ca, sa, ref, ref_start, Int32(i), start_check_from)
         update_color!(color, ref_id, sa[i], Int32(match_size), ca)
         i += move_dir        
     end
@@ -126,13 +132,14 @@ function align(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}
         if max_match_size > 0 
             while ref_start <= length(ref)
                        # Check the match size at this point 
-                max_match_size = check_this_point(ca, sa, ref, ref_start, max_match_index, Int32(max_match_size-1)) # skip k-1
+                max_match_size = check_this_point(ca, sa, ref, ref_start, max_match_index, Int32(max_match_size)) # skip k-1
                 
                 # If we don't have any match we don't have to check the flanks
                 max_match_size == 0 && break 
-                update_color!(color, ref_id, sa[max_match_index], Int32(max_match_size), ca)
+                #update_color!(color, ref_id, sa[max_match_index], Int32(max_match_size), ca)
                               
                 # Check up and down in suffix array for other matches
+                #println("extend check")
                 extend_from_point!(ca, sa, ref, lcp, max_match_index, false, ref_start, Int32(max_match_size), ref_id, color)
                 extend_from_point!(ca, sa, ref, lcp, max_match_index, true, ref_start, Int32(max_match_size), ref_id, color)
 
@@ -149,18 +156,26 @@ end
 
 function align_forward_and_reverse(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}, ref::Vector{Int32}, inv_perm_sa::Vector{Int32}, lcp::Vector{Int32})
     # First do the forward align 
+    println("REF: ", ref_id, " with size: ", length(ref))
+    println("> Forward")
     align(ref_id, color, ca, sa, ref, inv_perm_sa,lcp)
     # Flip the nodes and reverse to do the reverse alignment 
     reverse_complement_ref!(ref)
+    println("> Reverse")
+    println()
     align(ref_id, color, ca, sa, ref, inv_perm_sa,lcp)
 end
 
 function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, out_file::String; blacklist::String = "") 
     
-    blacklist_ids = !isempty(blacklist) ? read_ids_from_file(blacklist) : OrderedSet{String}()
+   blacklist_ids = !isempty(blacklist) ? read_ids_from_file(blacklist) : OrderedSet{String}()
+   #blacklist_ids = OrderedSet{String}()
 
     println("Reading queries")
     queries, query_ids = processGFA(gfa, query_file)
+
+    # queries = [Int32[1,2,3,4], Int32[1,2,3,4,5], Int32[6,7,8]]
+    # refs = [ Int32[1,2,3,4], Int32[1,2,3,4,5]]
     
     println("Creating suffix array")
     ca, sa = create_k_suffix_array(queries, Int32(0))
@@ -171,6 +186,8 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
 
     println("Get node sizes")
     size_map = read_node_sizes(seq_file)
+    #size_map = Dict( unique([(queries...)...]) .=> 50)
+    #println(size_map)
     len = zeros(Int32, length(ca))
     ori =  [Origin(-1,-1) for i in 1:length(ca)] # Vector{Origin}(undef, length(ca)) 
     color = Color(len, ori, size_map, k_size)
@@ -178,21 +195,21 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
     limit = 500
     p = Progress(limit)
     println("Start aligning...")
-    @profile for (ref_id, line) in enumerate(eachline(gfa))
+    for (ref_id, line) in enumerate(eachline(gfa))
        identifier, path = split(line, "\t")
        if ref_id == limit
-        break 
+         break 
        end
        if !(identifier in query_ids) && !(identifier in blacklist_ids)
            path_numbers = parse_numbers(path)
-           align_forward_and_reverse(Int32(ref_id), color, ca, sa, path_numbers, inv_sa_perm, lcp)
+           @time align_forward_and_reverse(Int32(ref_id), color, ca, sa, path_numbers, inv_sa_perm, lcp)
            next!(p)
        end
     end
 
-    writeResults(ca, color, query_ids, out_file, size_map)
+    #writeResults(ca, color, query_ids, out_file, size_map)
 
-    save("test.jlprof",  Profile.retrieve()...)
+   # save("test.jlprof",  Profile.retrieve()...)
 end
 
-# run("test", "test", "test", Int32(31), "test")
+run("test", "test", "test", Int32(31), "test")
