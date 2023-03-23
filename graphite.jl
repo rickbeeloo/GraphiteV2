@@ -1,8 +1,7 @@
-using ProgressMeter
-using Profile, FileIO
-using OrderedCollections
-include("./suffixArray.jl")
-include("./graph_io.jl")
+#using ProgressMeter
+#using Profile, FileIO
+
+
 
 const MASK = Int32(1<<30) 
 
