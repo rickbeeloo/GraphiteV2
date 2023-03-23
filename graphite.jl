@@ -2,6 +2,7 @@ using ProgressMeter
 using Profile, FileIO
 using OrderedCollections
 include("./suffixArray.jl")
+include("./graph_io.jl")
 
 const MASK = Int32(1<<30) 
 
@@ -172,7 +173,7 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
    #blacklist_ids = OrderedSet{String}()
 
     println("Reading queries")
-    queries, query_ids = processGFA(gfa, query_file, first_n=100)
+    queries, query_ids = processGFA(gfa, query_file; first_n=100)
 
     # queries = [Int32[1,2,3,4], Int32[1,2,3,4,5], Int32[6,7,8]]
     # refs = [ Int32[1,2,3,4], Int32[1,2,3,4,5]]
