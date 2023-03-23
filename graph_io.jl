@@ -9,14 +9,17 @@ function parse_numbers(path::AbstractString)
 end
 
 function read_queries(f::String, query_ids::OrderedSet{String})
+    found = 0
     queries = Vector{Vector{Int32}}()
     query_ids_file_order = OrderedSet{String}() # Might find in different order in the file than query_ids
     for (i, line) in enumerate(eachline(f))
         identifier, path = split(line, "\t")
         if identifier in query_ids
+            found +=1
             path_numbers = parse_numbers(path)
             push!(query_ids_file_order, identifier)
             push!(queries, path_numbers)
+            found == length(query_ids) && break
         end
     end
     return queries, query_ids_file_order
