@@ -33,19 +33,19 @@ function read_node_sizes(f::String)
     return size_map
 end
 
-function read_ids_from_file(f::String)
+function read_ids_from_file(f::String, first_n::Int64)
     ids = OrderedSet{String}()
-    for line in eachline(f)
+    for (i, line) in enumerate(eachline(f))
         push!(ids, strip(line))
+        first_n > 0 && i == (first_n-1) && break 
     end
     return ids
 end
 
 function processGFA(gfa::String, query_file::String; first_n = -1)
     # Read the query ids from the file 
-    query_ids = read_ids_from_file(query_file)
+    query_ids = read_ids_from_file(query_file, first_n)
     # Get the first X if specified (handy for testing)
-    query_ids = first_n > 0 ? query_ids[1:first_n] : query_ids
     queries, query_ids = read_queries(gfa, query_ids)
     return queries, query_ids
 end

@@ -207,4 +207,4 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
    # save("test.jlprof",  Profile.retrieve()...)
 end
 
-run("test", "test", "test", Int32(31), "test")
+#run("test", "test", "test", Int32(31), "test")
