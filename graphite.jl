@@ -22,6 +22,7 @@ struct Color
 end
 
 function update_color!(color::Color, ref_id::Int32, match_start::Int32, match_size::Int32, ca::Vector{Int32})
+    return
     
     match_end = match_start+match_size-1
     
