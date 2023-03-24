@@ -1,3 +1,8 @@
+using OrderedCollections
+
+#include("./graph_io.jl")
+include("./suffixArray.jl")
+
 const MASK = Int32(1<<30) 
 
 flipnode(n::Int32) = n ⊻ MASK
@@ -19,13 +24,15 @@ struct Color
 end
 
 
-function get_match_size(color::Color, ca::Vector{Int32}, match_start::Int32, match_end::Int32)
+function get_match_size(color::Color, ca::Vector{Int32}, match_start::Int32, match_size::Int32)
     # This would alloc cause of intermediate array
     #match_size_nt = sum(get.(Ref(color.size_map), view(ca, match_start:match_end), 0))
-    match_size = 0
+    match_size_nt = 0
+    match_end = match_start+match_size-1
     for i in match_start:match_end
-        match_size += get(color.size_map, ca[i], 0)
+        match_size_nt += get(color.size_map, ca[i], 0)
     end
+    println("MS: ", match_size)
     match_size_nt = match_size_nt - ((match_size-1) * (color.k_size-1)) 
     return match_size_nt
 end
@@ -33,25 +40,25 @@ end
 
 function update_color!(color::Color, ref_id::Int32, match_start::Int32, match_size::Int32, ca::Vector{Int32})
     
-    match_end = match_start+match_size-1
+    match_end = match_start+match_size-Int32(1)
     
     # Get info from pervious matches
     at_start = color.origin[match_start]
     at_end   = color.origin[match_end]
 
     if at_start.id > 0 && at_start.id == at_end.id && at_start.pos == at_end.pos
-        #println("COLOR_UPDATE: Max already")
+        println("COLOR_UPDATE: Max already")
         return
     # Don't have to bother about single node matches as they can't be longer anyway
     elseif match_start ==  match_end && color.len[match_start] > 0
-        #println("COLOR_UPDATE: Max already")
+        println("COLOR_UPDATE: Single max already")
         return
     else
         
-        match_size_nt =  get_match_size(color, ca, match_start, match_end) #sum(get.(Ref(color.size_map), view(ca, match_start:match_end), 0))
+        match_size_nt =  get_match_size(color, ca, match_start, match_size) #sum(get.(Ref(color.size_map), view(ca, match_start:match_end), 0))
         # We have to consider to overlap between k-mers as well 
         
-        println("COLOR_UPDATE: Max already: ", match_size_nt)
+        println("COLOR_UPDATE: adding size: ", match_size_nt)
         for i in match_start:match_end
             if color.len[i] < match_size_nt 
                 color.len[i]  = match_size_nt
@@ -178,14 +185,14 @@ end
 
 function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, out_file::String; blacklist::String = "") 
     
-   blacklist_ids = !isempty(blacklist) ? read_ids_from_file(blacklist) : OrderedSet{String}()
-   #blacklist_ids = OrderedSet{String}()
+   #blacklist_ids = !isempty(blacklist) ? read_ids_from_file(blacklist) : OrderedSet{String}()
+   blacklist_ids = OrderedSet{String}()
 
     println("Reading queries")
-    queries, query_ids = processGFA(gfa, query_file; first_n=100)
+    #queries, query_ids = processGFA(gfa, query_file; first_n=100)
 
-    # queries = [Int32[1,2,3,4], Int32[1,2,3,4,5], Int32[6,7,8]]
-    # refs = [ Int32[1,2,3,4], Int32[1,2,3,4,5]]
+    queries = [Int32[1,2,3,4], Int32[1,2,3,4,5], Int32[6,7,8]]
+    refs = [ Int32[1,2,3,4], Int32[1,2,3,4,5]]
     
     println("Creating suffix array")
     ca, sa = create_k_suffix_array(queries, Int32(0))
@@ -196,8 +203,8 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
     lcp = build_lcp(sa, ca)
 
     println("Get node sizes")
-    size_map = read_node_sizes(seq_file)
-    #size_map = Dict( unique([(queries...)...]) .=> 50)
+    #size_map = read_node_sizes(seq_file)
+    size_map = Dict( unique([(queries...)...]) .=> 50)
     #println(size_map)
     len = zeros(Int32, length(ca))
     ori =  [Origin(-1,-1) for i in 1:length(ca)] # Vector{Origin}(undef, length(ca)) 
@@ -206,16 +213,16 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
     limit = 500
     #p = Progress(limit)
     println("Start aligning...")
-    for (ref_id, line) in enumerate(eachline(gfa))
-       identifier, path = split(line, "\t")
-       if ref_id == limit
-         break 
-       end
-       if !(identifier in query_ids) && !(identifier in blacklist_ids)
-           path_numbers = parse_numbers(path)
-           align_forward_and_reverse(Int32(ref_id), color, ca, sa, path_numbers, inv_sa_perm, lcp)
+    for (ref_id, path_numbers) in enumerate(refs)  # enumerate(eachline(gfa))
+    #    identifier, path = split(line, "\t")
+    #    if ref_id == limit
+    #      break 
+    #    end
+    #    if !(identifier in query_ids) && !(identifier in blacklist_ids)
+    #        path_numbers = parse_numbers(path)
+        align_forward_and_reverse(Int32(ref_id), color, ca, sa, path_numbers, inv_sa_perm, lcp)
           # next!(p)
-       end
+      # end
     end
 
     #writeResults(ca, color, query_ids, out_file, size_map)
@@ -223,4 +230,4 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
    # save("test.jlprof",  Profile.retrieve()...)
 end
 
-#run("test", "test", "test", Int32(31), "test")
+run("test", "test", "test", Int32(31), "test")
