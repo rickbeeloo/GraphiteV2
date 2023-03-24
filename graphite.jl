@@ -18,6 +18,19 @@ struct Color
     k_size::Int32
 end
 
+
+function get_match_size(color::Color, ca::Vector{Int32}, start::Int, stop::Int)
+    # This would alloc cause of intermediate array
+    #match_size_nt = sum(get.(Ref(color.size_map), view(ca, match_start:match_end), 0))
+    match_size = 0
+    for i in match_start:match_end
+        match_size += get(color.size_map, ca[i], 0)
+    end
+    match_size_nt = match_size_nt - ((match_size-1) * (color.k_size-1)) 
+    return match_size_nt
+end
+
+
 function update_color!(color::Color, ref_id::Int32, match_start::Int32, match_size::Int32, ca::Vector{Int32})
     
     match_end = match_start+match_size-1
@@ -35,9 +48,9 @@ function update_color!(color::Color, ref_id::Int32, match_start::Int32, match_si
         return
     else
         
-        match_size_nt = sum(get.(Ref(color.size_map), view(ca, match_start:match_end), 0))
+        match_size_nt =  get_match_size(color, ca, match_start, match_end) #sum(get.(Ref(color.size_map), view(ca, match_start:match_end), 0))
         # We have to consider to overlap between k-mers as well 
-        match_size_nt = match_size_nt - ((match_size-1) * (color.k_size-1)) 
+        
         println("COLOR_UPDATE: Max already: ", match_size_nt)
         for i in match_start:match_end
             if color.len[i] < match_size_nt 
