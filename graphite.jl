@@ -202,8 +202,8 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
     println("Reading queries")
     queries, query_ids = processGFA(gfa, query_file; first_n=100)
 
-    queries = [Int32[1,2,3,4], Int32[1,2,3,4,5], Int32[6,7,8]]
-    refs = [ Int32[1,2,3,4], Int32[1,2,3,4,5]]
+    #queries = [Int32[1,2,3,4], Int32[1,2,3,4,5], Int32[6,7,8]]
+    #refs = [ Int32[1,2,3,4], Int32[1,2,3,4,5]]
 
     # Construct the suffix arrays in parallel
     chunk_offsets = divide(queries)
@@ -231,7 +231,7 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
     end
 
 
-    limit = 500
+    limit = 1_840_749
     p = Progress(limit)
     println("Start aligning...")
     for (ref_id, line) in  enumerate(eachline(gfa))
