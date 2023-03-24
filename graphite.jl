@@ -1,7 +1,9 @@
-using OrderedCollections
+#using OrderedCollections
+using ProgressMeter
 
 #include("./graph_io.jl")
-include("./suffixArray.jl")
+# include("./suffixArray.jl")
+# include("./parallel.jl")
 
 const MASK = Int32(1<<30) 
 
@@ -32,7 +34,7 @@ function get_match_size(color::Color, ca::Vector{Int32}, match_start::Int32, mat
     for i in match_start:match_end
         match_size_nt += get(color.size_map, ca[i], 0)
     end
-    println("MS: ", match_size)
+    #println("MS: ", match_size)
     match_size_nt = match_size_nt - ((match_size-1) * (color.k_size-1)) 
     return match_size_nt
 end
@@ -47,18 +49,18 @@ function update_color!(color::Color, ref_id::Int32, match_start::Int32, match_si
     at_end   = color.origin[match_end]
 
     if at_start.id > 0 && at_start.id == at_end.id && at_start.pos == at_end.pos
-        println("COLOR_UPDATE: Max already")
+        #println("COLOR_UPDATE: Max already")
         return
     # Don't have to bother about single node matches as they can't be longer anyway
     elseif match_start ==  match_end && color.len[match_start] > 0
-        println("COLOR_UPDATE: Single max already")
+        #println("COLOR_UPDATE: Single max already")
         return
     else
         
         match_size_nt =  get_match_size(color, ca, match_start, match_size) #sum(get.(Ref(color.size_map), view(ca, match_start:match_end), 0))
         # We have to consider to overlap between k-mers as well 
         
-        println("COLOR_UPDATE: adding size: ", match_size_nt)
+        #println("COLOR_UPDATE: adding size: ", match_size_nt)
         for i in match_start:match_end
             if color.len[i] < match_size_nt 
                 color.len[i]  = match_size_nt
@@ -140,7 +142,7 @@ function align(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}
     while ref_start <= length(ref)
 
         # Do binary search to locate the insert point
-        println("Binary searching")
+        #println("Binary searching")
         insert_point = locate_insert_point(sa, ca, view(ref, ref_start:length(ref)))
         max_match_index, max_match_size = decide_on_seed(insert_point, ca, sa, ref, ref_start)
 
@@ -172,15 +174,24 @@ end
 
 function align_forward_and_reverse(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}, ref::Vector{Int32}, inv_perm_sa::Vector{Int32}, lcp::Vector{Int32})
     # First do the forward align 
-    println("REF: ", ref_id, " with size: ", length(ref))
-    println("> Forward")
-    @time align(ref_id, color, ca, sa, ref, inv_perm_sa,lcp)
+    #println("REF: ", ref_id, " with size: ", length(ref))
+    #println("> Forward")
+    align(ref_id, color, ca, sa, ref, inv_perm_sa,lcp)
     # Flip the nodes and reverse to do the reverse alignment 
     reverse_complement_ref!(ref)
-    println("> Reverse")
-    @time align(ref_id, color, ca, sa, ref, inv_perm_sa,lcp)
-    println()
+    #println("> Reverse")
+    align(ref_id, color, ca, sa, ref, inv_perm_sa,lcp)
+    #println()
     
+end
+
+
+struct Chunk
+    sa::Vector{Int32}
+    ca::Vector{Int32}
+    lcp::Vector{Int32}
+    inv::Vector{Int32}
+    color::Color
 end
 
 function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, out_file::String; blacklist::String = "") 
@@ -193,36 +204,48 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
 
     queries = [Int32[1,2,3,4], Int32[1,2,3,4,5], Int32[6,7,8]]
     refs = [ Int32[1,2,3,4], Int32[1,2,3,4,5]]
-    
-    println("Creating suffix array")
-    ca, sa = create_k_suffix_array(queries, Int32(0))
-    println("CA size: ", length(ca))
-    println("Creating inv perm")
-    inv_sa_perm = inverse_perm_sa(sa)
-    println("Building LCP")
-    lcp = build_lcp(sa, ca)
 
-    println("Get node sizes")
-    #size_map = read_node_sizes(seq_file)
+    # Construct the suffix arrays in parallel
+    chunk_offsets = divide(queries)
+    println("Chunks: ", length(chunk_offsets))
+
     size_map = Dict( unique([(queries...)...]) .=> 50)
-    #println(size_map)
-    len = zeros(Int32, length(ca))
-    ori =  [Origin(-1,-1) for i in 1:length(ca)] # Vector{Origin}(undef, length(ca)) 
-    color = Color(len, ori, size_map, k_size)
+    # size_map = read_node_sizes(seq_file)
+
+    # Get the data for each chunk
+    chunks = Chunk[]
+    Threads.@threads for i in 1:length(chunk_offsets)-1
+        qs = view(queries, chunk_offsets[i]:chunk_offsets[i+1]-1)
+        #println("Working on chunk: ", qs)
+        ca, sa = create_k_suffix_array(qs, Int32(0))
+        #println("CA size: ", length(ca))
+        #println("Creating inv perm")
+        inv_sa_perm = inverse_perm_sa(sa)
+        #println("Building LCP")
+        lcp = build_lcp(sa, ca)
+        len = zeros(Int32, length(ca))
+        ori =  [Origin(-1,-1) for i in 1:length(ca)] # Vector{Origin}(undef, length(ca)) 
+        color = Color(len, ori, size_map, k_size)
+        chunk = Chunk(sa, ca, lcp, inv_sa_perm, color)
+        push!(chunks, chunk)
+    end
+
+
 
     limit = 500
-    #p = Progress(limit)
+    p = Progress(limit)
     println("Start aligning...")
-    for (ref_id, path_numbers) in enumerate(refs)  # enumerate(eachline(gfa))
-    #    identifier, path = split(line, "\t")
-    #    if ref_id == limit
-    #      break 
-    #    end
-    #    if !(identifier in query_ids) && !(identifier in blacklist_ids)
-    #        path_numbers = parse_numbers(path)
-        align_forward_and_reverse(Int32(ref_id), color, ca, sa, path_numbers, inv_sa_perm, lcp)
-          # next!(p)
-      # end
+    for (ref_id, line) in  enumerate(eachline(gfa))
+        identifier, path = split(line, "\t")
+        if ref_id == limit
+            break 
+        end
+        if !(identifier in query_ids) && !(identifier in blacklist_ids)
+            path_numbers = parse_numbers(path)
+            Threads.@threads for chunk in chunks
+                align_forward_and_reverse(Int32(ref_id), chunk.color, chunk.ca, chunk.sa, path_numbers, chunk.inv, chunk.lcp)
+            end
+        next!(p)
     end
 
     #writeResults(ca, color, query_ids, out_file, size_map)
@@ -230,4 +253,4 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
    # save("test.jlprof",  Profile.retrieve()...)
 end
 
-run("test", "test", "test", Int32(31), "test")
+#run("test", "test", "test", Int32(31), "test")

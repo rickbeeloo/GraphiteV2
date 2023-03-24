@@ -2,7 +2,7 @@
 
 const LIBSAIS = "libsais-2.7.1/libsais.so.2"
 
-function concat_with_seperator(vectors::Vector{Vector{Int32}})
+function concat_with_seperator(vectors::AbstractVector{Vector{Int32}})
     # Probably a cleaner way to do this :) Like using map 
     # to flip the node ids in slices and copying the slices to the output
     total_size = sum(map(length, vectors))
@@ -22,7 +22,7 @@ function concat_with_seperator(vectors::Vector{Vector{Int32}})
     return concat_arr
 end
 
-function create_suffix_array(in_vector::Vector{Int32}, free_space::Int32)
+function create_suffix_array(in_vector::AbstractVector{Int32}, free_space::Int32)
     out_vector = zeros(Int32, length(in_vector) + free_space)
     d = Dict(Iterators.map(reverse,pairs(sort(unique(in_vector)))))
     in_vector = Int32.(get.(Ref(d), in_vector, 0))
@@ -33,7 +33,7 @@ function create_suffix_array(in_vector::Vector{Int32}, free_space::Int32)
     return out_vector
 end
 
-function create_k_suffix_array(vectors::Vector{Vector{Int32}}, free_space::Int32)
+function create_k_suffix_array(vectors::AbstractVector{Vector{Int32}}, free_space::Int32)
     concat_array = concat_with_seperator(vectors)
     suffix_array = create_suffix_array(concat_array, free_space)
     return concat_array, suffix_array

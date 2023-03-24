@@ -4,6 +4,7 @@ using ArgParse
 include("./graphite.jl")
 include("./graph_io.jl")
 include("./suffixArray.jl")
+include("./parallel.jl")
 
 # Function to parse command line options
 function parse_commandline()
