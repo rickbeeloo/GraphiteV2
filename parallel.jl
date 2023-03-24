@@ -2,6 +2,7 @@
 
 function divide(queries::Vector{Vector{Int32}})
     threads = Threads.nthreads()
+    threads = 70
     total_size = sum(map(length, queries))
     println("Total size: ", total_size)
     println("Threads: ", threads)
