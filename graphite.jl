@@ -196,11 +196,11 @@ end
 
 function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, out_file::String; blacklist::String = "") 
     
-   #blacklist_ids = !isempty(blacklist) ? read_ids_from_file(blacklist) : OrderedSet{String}()
-   blacklist_ids = OrderedSet{String}()
+   blacklist_ids = !isempty(blacklist) ? read_ids_from_file(blacklist) : OrderedSet{String}()
+   #blacklist_ids = OrderedSet{String}()
 
     println("Reading queries")
-    #queries, query_ids = processGFA(gfa, query_file; first_n=100)
+    queries, query_ids = processGFA(gfa, query_file; first_n=100)
 
     queries = [Int32[1,2,3,4], Int32[1,2,3,4,5], Int32[6,7,8]]
     refs = [ Int32[1,2,3,4], Int32[1,2,3,4,5]]
@@ -209,8 +209,8 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
     chunk_offsets = divide(queries)
     println("Chunks: ", length(chunk_offsets))
 
-    size_map = Dict( unique([(queries...)...]) .=> 50)
-    # size_map = read_node_sizes(seq_file)
+    #size_map = Dict( unique([(queries...)...]) .=> 50)
+    size_map = read_node_sizes(seq_file)
 
     # Get the data for each chunk
     chunks = Chunk[]
@@ -245,6 +245,7 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
             Threads.@threads for chunk in chunks
                 align_forward_and_reverse(Int32(ref_id), chunk.color, chunk.ca, chunk.sa, path_numbers, chunk.inv, chunk.lcp)
             end
+        end
         next!(p)
     end
 
