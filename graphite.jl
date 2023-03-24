@@ -19,7 +19,7 @@ struct Color
 end
 
 
-function get_match_size(color::Color, ca::Vector{Int32}, start::Int, stop::Int)
+function get_match_size(color::Color, ca::Vector{Int32}, match_start::Int32, match_end::Int32)
     # This would alloc cause of intermediate array
     #match_size_nt = sum(get.(Ref(color.size_map), view(ca, match_start:match_end), 0))
     match_size = 0
