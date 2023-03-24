@@ -231,7 +231,6 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
     end
 
 
-
     limit = 500
     p = Progress(limit)
     println("Start aligning...")
