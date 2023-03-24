@@ -127,7 +127,7 @@ function align(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}
         if max_match_size > 0 
             while ref_start <= length(ref)
                        # Check the match size at this point 
-                max_match_size = check_this_point(ca, sa, ref, ref_start, max_match_index, Int32(max_match_size)) # skip k-1
+                max_match_size = check_this_point(ca, sa, ref, ref_start, max_match_index, Int32(max_match_size)-Int32(1)) # skip k-1
                 
                 # If we don't have any match we don't have to check the flanks
                 max_match_size == 0 && break 
@@ -157,8 +157,9 @@ function align_forward_and_reverse(ref_id::Int32, color::Color, ca::Vector{Int32
     # Flip the nodes and reverse to do the reverse alignment 
     reverse_complement_ref!(ref)
     println("> Reverse")
-    println()
     align(ref_id, color, ca, sa, ref, inv_perm_sa,lcp)
+    println()
+    
 end
 
 function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, out_file::String; blacklist::String = "") 
@@ -174,6 +175,7 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
     
     println("Creating suffix array")
     ca, sa = create_k_suffix_array(queries, Int32(0))
+    println("CA size: ", length(ca))
     println("Creating inv perm")
     inv_sa_perm = inverse_perm_sa(sa)
     println("Building LCP")
