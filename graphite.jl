@@ -120,6 +120,7 @@ function align(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}
     while ref_start <= length(ref)
 
         # Do binary search to locate the insert point
+        println("Binary searching")
         insert_point = locate_insert_point(sa, ca, view(ref, ref_start:length(ref)))
         max_match_index, max_match_size = decide_on_seed(insert_point, ca, sa, ref, ref_start)
 
@@ -153,11 +154,11 @@ function align_forward_and_reverse(ref_id::Int32, color::Color, ca::Vector{Int32
     # First do the forward align 
     println("REF: ", ref_id, " with size: ", length(ref))
     println("> Forward")
-    align(ref_id, color, ca, sa, ref, inv_perm_sa,lcp)
+    @time align(ref_id, color, ca, sa, ref, inv_perm_sa,lcp)
     # Flip the nodes and reverse to do the reverse alignment 
     reverse_complement_ref!(ref)
     println("> Reverse")
-    align(ref_id, color, ca, sa, ref, inv_perm_sa,lcp)
+    @time align(ref_id, color, ca, sa, ref, inv_perm_sa,lcp)
     println()
     
 end
@@ -190,7 +191,7 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
     color = Color(len, ori, size_map, k_size)
 
     limit = 500
-    p = Progress(limit)
+    #p = Progress(limit)
     println("Start aligning...")
     for (ref_id, line) in enumerate(eachline(gfa))
        identifier, path = split(line, "\t")
@@ -199,8 +200,8 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
        end
        if !(identifier in query_ids) && !(identifier in blacklist_ids)
            path_numbers = parse_numbers(path)
-           @time align_forward_and_reverse(Int32(ref_id), color, ca, sa, path_numbers, inv_sa_perm, lcp)
-           next!(p)
+           align_forward_and_reverse(Int32(ref_id), color, ca, sa, path_numbers, inv_sa_perm, lcp)
+          # next!(p)
        end
     end
 
