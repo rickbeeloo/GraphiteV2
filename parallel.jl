@@ -3,7 +3,10 @@
 function divide(queries::Vector{Vector{Int32}})
     threads = Threads.nthreads()
     total_size = sum(map(length, queries))
+    println("Total size: ", total_size)
+    println("Threads: ", threads)
     chunk_size_approx = floor(Int, total_size / threads)
+    println("Approx: ", chunk_size_approx)
     chunk_size_approx > 0 || error("Bug in divide")
     println("Chunk size apprix: ", chunk_size_approx)
 
