@@ -1,4 +1,5 @@
 using OrderedCollections
+using Profile, FileIO
 using LoopVectorization
 
 #include("./graph_io.jl")
@@ -148,7 +149,8 @@ function align(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}
         # If we have a match keep using the linked list to extend 
         if max_match_size > 0 
             while ref_start <= length(ref)
-                       # Check the match size at this point 
+                
+                # Check the match size at this point 
                 max_match_size = check_this_point(ca, sa, ref, ref_start, max_match_index, Int32(max_match_size)-Int32(1)) # skip k-1
                 
                 # If we don't have any match we don't have to check the flanks
@@ -156,7 +158,6 @@ function align(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}
                 #update_color!(color, ref_id, sa[max_match_index], Int32(max_match_size), ca)
                               
                 # Check up and down in suffix array for other matches
-                #println("extend check")
                 extend_from_point!(ca, sa, ref, lcp, max_match_index, false, ref_start, Int32(max_match_size), ref_id, color)
                 extend_from_point!(ca, sa, ref, lcp, max_match_index, true, ref_start, Int32(max_match_size), ref_id, color)
 
@@ -192,8 +193,8 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
     println("Reading queries")
     #queries, query_ids = processGFA(gfa, query_file; first_n=100)
 
-    queries = [Int32[1,2,3,4], Int32[1,2,3,4,5], Int32[6,7,8]]
-    refs = [ Int32[1,2,3,4], Int32[1,2,3,4,5]]
+    #queries = [Int32[1,2,3,4], Int32[1,2,3,4,5], Int32[6,7,8]]
+    # refs = [ Int32[1,2,3,4], Int32[1,2,3,4,5]]
     
     println("Creating suffix array")
     ca, sa = create_k_suffix_array(queries, Int32(0))
@@ -204,31 +205,31 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
     lcp = build_lcp(sa, ca)
 
     println("Get node sizes")
-    #size_map = read_node_sizes(seq_file)
-    size_map = Dict( unique([(queries...)...]) .=> 50)
+    size_map = read_node_sizes(seq_file)
+    #size_map = Dict( unique([(queries...)...]) .=> 50)
     #println(size_map)
     len = zeros(Int32, length(ca))
     ori =  [Origin(-1,-1) for i in 1:length(ca)] # Vector{Origin}(undef, length(ca)) 
     color = Color(len, ori, size_map, k_size)
 
     limit = 500
-    #p = Progress(limit)
+    p = Progress(limit)
     println("Start aligning...")
-    for (ref_id, path_numbers) in enumerate(refs)  # enumerate(eachline(gfa))
-    #    identifier, path = split(line, "\t")
-    #    if ref_id == limit
-    #      break 
-    #    end
-    #    if !(identifier in query_ids) && !(identifier in blacklist_ids)
-    #        path_numbers = parse_numbers(path)
+    for (ref_id, line) in enumerate(eachline(gfa))
+       identifier, path = split(line, "\t")
+       if ref_id == limit
+         break 
+       end
+       if !(identifier in query_ids) && !(identifier in blacklist_ids)
+           path_numbers = parse_numbers(path)
         align_forward_and_reverse(Int32(ref_id), color, ca, sa, path_numbers, inv_sa_perm, lcp)
-          # next!(p)
-      # end
+          next!(p)
+      end
     end
 
     #writeResults(ca, color, query_ids, out_file, size_map)
 
-   # save("test.jlprof",  Profile.retrieve()...)
+    save("test.jlprof",  Profile.retrieve()...)
 end
 
-run("test", "test", "test", Int32(31), "test")
+#run("test", "test", "test", Int32(31), "test")
