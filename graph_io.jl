@@ -37,6 +37,7 @@ function read_queries(f::String, query_ids::OrderedSet{String})
     #         found == length(query_ids) && break
     #     end
     # end
+    println("Done reading queires, read: ", length(queries))
     return queries, query_ids_file_order
 end
 
@@ -51,19 +52,17 @@ function read_node_sizes(f::String)
     return size_map
 end
 
-function read_ids_from_file(f::String, first_n::Int64)
+
 function read_ids_from_file(f::String, first_n::Int64)
     ids = OrderedSet{String}()
     for (i, line) in enumerate(eachline(f))
-    for (i, line) in enumerate(eachline(f))
         push!(ids, strip(line))
-        first_n > 0 && i == (first_n-1) && break 
         first_n > 0 && i == (first_n-1) && break 
     end
     return ids
 end
 
-function processGFA(gfa::String, query_file::String; first_n = -1)
+
 function processGFA(gfa::String, query_file::String; first_n = -1)
     # Read the query ids from the file 
     query_ids = read_ids_from_file(query_file, first_n)
@@ -101,7 +100,5 @@ function writeResults(ca::Vector{Int32}, color::Color, query_ids::OrderedSet{Str
         end 
 
     end
-        
-
 end
 
