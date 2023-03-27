@@ -59,8 +59,7 @@ end
 function update_color!(color::Color, ref_id::Int32, match_start::Int32, match_size::Int32, ca::Vector{Int32})
     
     match_end = match_start+match_size-Int32(1)
-    match_end = match_start+match_size-Int32(1)
-    
+        
     # Get info from pervious matches
     at_start = color.origin[match_start]
     at_end   = color.origin[match_end]
@@ -77,15 +76,8 @@ function update_color!(color::Color, ref_id::Int32, match_start::Int32, match_si
     else
         
         match_size_nt =  get_match_size(color, ca, match_start, match_size) #sum(get.(Ref(color.size_map), view(ca, match_start:match_end), 0))
-        
-        match_size_nt =  get_match_size(color, ca, match_start, match_size) #sum(get.(Ref(color.size_map), view(ca, match_start:match_end), 0))
-        # We have to consider to overlap between k-mers as well 
-        
         #println("COLOR_UPDATE: adding size: ", match_size_nt)
-        @simd @inbounds for i in match_start:match_end
-        
-        #println("COLOR_UPDATE: adding size: ", match_size_nt)
-        @simd @inbounds for i in match_start:match_end
+        @inbounds @simd  for i in match_start:match_end
             if color.len[i] < match_size_nt 
                 color.len[i]  = match_size_nt
                 color.origin[i] = Origin(ref_id, match_start)
