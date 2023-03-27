@@ -18,6 +18,7 @@ function read_queries(f::String, query_ids::OrderedSet{String})
 
     for line in eachline(q_paths)
         identifier, path = split(line, "\t")
+        path_numbers = parse_numbers(path)
         push!(query_ids_file_order, identifier)
         push!(queries, path_numbers)
     end
