@@ -209,7 +209,7 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
     blacklist_ids = OrderedSet{String}()
 
     println("Reading queries")
-    queries, query_ids = processGFA(gfa, query_file; first_n=100)
+    queries, query_ids = processGFA(gfa, query_file)
     
     println("Creating suffix array")
     ca, sa = create_k_suffix_array(queries, Int32(0))
