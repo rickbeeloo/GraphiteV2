@@ -1,4 +1,5 @@
 using OrderedCollections
+using LoopVectorization
 
 #include("./graph_io.jl")
 include("./suffixArray.jl")
@@ -59,7 +60,7 @@ function update_color!(color::Color, ref_id::Int32, match_start::Int32, match_si
         # We have to consider to overlap between k-mers as well 
         
         println("COLOR_UPDATE: adding size: ", match_size_nt)
-        for i in match_start:match_end
+        @turbo for i in match_start:match_end
             if color.len[i] < match_size_nt 
                 color.len[i]  = match_size_nt
                 color.origin[i] = Origin(ref_id, match_start)
