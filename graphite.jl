@@ -1,6 +1,7 @@
 using OrderedCollections
 using Profile, FileIO
 using LoopVectorization
+using ProgressMeter
 
 #include("./graph_io.jl")
 include("./suffixArray.jl")
@@ -40,8 +41,24 @@ function get_match_size(color::Color, ca::Vector{Int32}, match_start::Int32, mat
 end
 
 
+
+function get_match_size(color::Color, ca::Vector{Int32}, match_start::Int32, match_size::Int32)
+    # This would alloc cause of intermediate array
+    #match_size_nt = sum(get.(Ref(color.size_map), view(ca, match_start:match_end), 0))
+    match_size_nt = 0
+    match_end = match_start+match_size-1
+    for i in match_start:match_end
+        match_size_nt += get(color.size_map, ca[i], 0)
+    end
+    # println("MS: ", match_size)
+    match_size_nt = match_size_nt - ((match_size-1) * (color.k_size-1)) 
+    return match_size_nt
+end
+
+
 function update_color!(color::Color, ref_id::Int32, match_start::Int32, match_size::Int32, ca::Vector{Int32})
     
+    match_end = match_start+match_size-Int32(1)
     match_end = match_start+match_size-Int32(1)
     
     # Get info from pervious matches
@@ -50,15 +67,22 @@ function update_color!(color::Color, ref_id::Int32, match_start::Int32, match_si
 
     if at_start.id > 0 && at_start.id == at_end.id && at_start.pos == at_end.pos
         #println("COLOR_UPDATE: Max already")
+        #println("COLOR_UPDATE: Max already")
         return
     # Don't have to bother about single node matches as they can't be longer anyway
     elseif match_start ==  match_end && color.len[match_start] > 0
+       # println("COLOR_UPDATE: Single max already")
        # println("COLOR_UPDATE: Single max already")
         return
     else
         
         match_size_nt =  get_match_size(color, ca, match_start, match_size) #sum(get.(Ref(color.size_map), view(ca, match_start:match_end), 0))
+        
+        match_size_nt =  get_match_size(color, ca, match_start, match_size) #sum(get.(Ref(color.size_map), view(ca, match_start:match_end), 0))
         # We have to consider to overlap between k-mers as well 
+        
+        #println("COLOR_UPDATE: adding size: ", match_size_nt)
+        @simd @inbounds for i in match_start:match_end
         
         #println("COLOR_UPDATE: adding size: ", match_size_nt)
         @simd @inbounds for i in match_start:match_end
@@ -113,6 +137,7 @@ function check_this_point(ca::Vector{Int32}, sa::Vector{Int32}, ref::AbstractVec
     ca_suffix_index = sa[point]
     ca_start = ca_suffix_index + skip
     #println("Checking suffix: ", view(ref, ref_start:length(ref)))
+    #println("Checking suffix: ", view(ref, ref_start:length(ref)))
     ref_start = ref_start + skip
     match_size = matches_till(ref, ref_start, ca, ca_start) + skip
     return match_size
@@ -122,20 +147,26 @@ function extend_from_point!(ca::Vector{Int32}, sa::Vector{Int32}, ref::Vector{In
     
     moves = 0
     
+    
+    moves = 0
+    
     move_dir = forward ? 1 : -1
     lcp_dir  = forward ? 0 :  1
    # println("Extending this point")
     i = point += move_dir
     while i > 1 && i <= length(sa) && lcp[i + lcp_dir] > 0
         moves +=1
+        moves +=1
         # We can skip the LCP part when extending, note though we also have to 
         # check the previous match size so min(lcp valu, prev match size)
         start_check_from = Int32(min(lcp[i + lcp_dir], match_size))
         # Check the size of this match starting from +1 of the LCP value)
         match_size = check_this_point(ca, sa, ref, ref_start, Int32(i), start_check_from)
+        match_size = check_this_point(ca, sa, ref, ref_start, Int32(i), start_check_from)
         update_color!(color, ref_id, sa[i], Int32(match_size), ca)
         i += move_dir        
     end
+    return match_size, moves
     return match_size, moves
 end
 
@@ -150,9 +181,19 @@ function align(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}
     nodes_updated = 0
     tot_moves = 0
 
+
+    # Keep track of some stats 
+    bin_searches = 0
+    nodes_updated = 0
+    tot_moves = 0
+
     while ref_start <= length(ref)
 
         # Do binary search to locate the insert point
+        #println("Binary searching")
+
+        bin_searches += 1 
+
         #println("Binary searching")
 
         bin_searches += 1 
@@ -167,8 +208,12 @@ function align(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}
                 # Check the match size at this point 
                 max_match_size = check_this_point(ca, sa, ref, ref_start, max_match_index, Int32(max_match_size)-Int32(1)) # skip k-1
                 
+                # Check the match size at this point 
+                max_match_size = check_this_point(ca, sa, ref, ref_start, max_match_index, Int32(max_match_size)-Int32(1)) # skip k-1
+                
                 # If we don't have any match we don't have to check the flanks
                 max_match_size == 0 && break 
+                #update_color!(color, ref_id, sa[max_match_index], Int32(max_match_size), ca)
                 #update_color!(color, ref_id, sa[max_match_index], Int32(max_match_size), ca)
                               
                 # Check up and down in suffix array for other matches
@@ -179,7 +224,15 @@ function align(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}
                 updates, moves = extend_from_point!(ca, sa, ref, lcp, max_match_index, true, ref_start, Int32(max_match_size), ref_id, color)
                 nodes_updated += updates
                 tot_moves += moves
+                updates, moves =  extend_from_point!(ca, sa, ref, lcp, max_match_index, false, ref_start, Int32(max_match_size), ref_id, color)
+                nodes_updated += updates
+                tot_moves += moves
 
+                updates, moves = extend_from_point!(ca, sa, ref, lcp, max_match_index, true, ref_start, Int32(max_match_size), ref_id, color)
+                nodes_updated += updates
+                tot_moves += moves
+
+                # Move to next location in suffix array for the second around
                 # Move to next location in suffix array for the second around
                 max_match_index = inv_perm_sa[sa[max_match_index]+1]
                 ref_start += Int32(1)
@@ -195,6 +248,12 @@ function align(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}
     println("Nodes updated: ", nodes_updated)
     println("Moves: ", tot_moves)
 
+
+    println("Stats for: ", ref_id)
+    println("Bin searches: ", bin_searches)
+    println("Nodes updated: ", nodes_updated)
+    println("Moves: ", tot_moves)
+
 end
 
 function align_forward_and_reverse(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}, ref::Vector{Int32}, inv_perm_sa::Vector{Int32}, lcp::Vector{Int32})
@@ -202,8 +261,15 @@ function align_forward_and_reverse(ref_id::Int32, color::Color, ca::Vector{Int32
     println("REF: ", ref_id, " with size: ", length(ref))
     println("> Forward")
     @time align(ref_id, color, ca, sa, ref, inv_perm_sa,lcp)
+    println("REF: ", ref_id, " with size: ", length(ref))
+    println("> Forward")
+    @time align(ref_id, color, ca, sa, ref, inv_perm_sa,lcp)
     # Flip the nodes and reverse to do the reverse alignment 
     reverse_complement_ref!(ref)
+    println("> Reverse")
+    @time align(ref_id, color, ca, sa, ref, inv_perm_sa,lcp)
+    println()
+    
     println("> Reverse")
     @time align(ref_id, color, ca, sa, ref, inv_perm_sa,lcp)
     println()
@@ -217,7 +283,16 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
 
     println("Reading queries")
     queries, query_ids = processGFA(gfa, query_file; first_n=100)
+   #blacklist_ids = !isempty(blacklist) ? read_ids_from_file(blacklist) : OrderedSet{String}()
+    blacklist_ids = OrderedSet{String}()
 
+    println("Reading queries")
+    queries, query_ids = processGFA(gfa, query_file; first_n=100)
+
+    #queries = [Int32[1,2,3,4], Int32[1,2,3,4,5], Int32[6,7,8]]
+    # refs = [ Int32[1,2,3,4], Int32[1,2,3,4,5]]
+    
+    println("Creating suffix array")
     #queries = [Int32[1,2,3,4], Int32[1,2,3,4,5], Int32[6,7,8]]
     # refs = [ Int32[1,2,3,4], Int32[1,2,3,4,5]]
     
@@ -225,12 +300,19 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
     ca, sa = create_k_suffix_array(queries, Int32(0))
     println("CA size: ", length(ca))
     println("Creating inv perm")
+    println("CA size: ", length(ca))
+    println("Creating inv perm")
     inv_sa_perm = inverse_perm_sa(sa)
+    println("Building LCP")
     println("Building LCP")
     lcp = build_lcp(sa, ca)
 
     println("Get node sizes")
+
+    println("Get node sizes")
     size_map = read_node_sizes(seq_file)
+    #size_map = Dict( unique([(queries...)...]) .=> 50)
+    #println(size_map)
     #size_map = Dict( unique([(queries...)...]) .=> 50)
     #println(size_map)
     len = zeros(Int32, length(ca))
@@ -240,8 +322,14 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
     limit = 500
     p = Progress(limit)
     println("Start aligning...")
+    limit = 500
+    p = Progress(limit)
+    println("Start aligning...")
     for (ref_id, line) in enumerate(eachline(gfa))
        identifier, path = split(line, "\t")
+       if ref_id == limit
+         break 
+       end
        if ref_id == limit
          break 
        end
@@ -250,11 +338,17 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
         align_forward_and_reverse(Int32(ref_id), color, ca, sa, path_numbers, inv_sa_perm, lcp)
           next!(p)
       end
+        align_forward_and_reverse(Int32(ref_id), color, ca, sa, path_numbers, inv_sa_perm, lcp)
+          next!(p)
+      end
     end
 
     #writeResults(ca, color, query_ids, out_file, size_map)
+    #writeResults(ca, color, query_ids, out_file, size_map)
 
+    save("test.jlprof",  Profile.retrieve()...)
     save("test.jlprof",  Profile.retrieve()...)
 end
 
+#run("test", "test", "test", Int32(31), "test")
 #run("test", "test", "test", Int32(31), "test")

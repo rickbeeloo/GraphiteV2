@@ -11,22 +11,31 @@ end
 function read_queries(f::String, query_ids::OrderedSet{String})
 
     # For later to speed up testing 
-    q_paths_out = open("query_paths.txt", "w+")
+    q_paths = open("query_paths.txt", "r")
 
-    found = 0
     queries = Vector{Vector{Int32}}()
-    query_ids_file_order = OrderedSet{String}() # Might find in different order in the file than query_ids
-    for (i, line) in enumerate(eachline(f))
+    query_ids_file_order = OrderedSet{String}()
+
+    for line in eachline(q_paths)
         identifier, path = split(line, "\t")
-        if identifier in query_ids
-            write(q_paths_out, line)
-            found +=1
-            path_numbers = parse_numbers(path)
-            push!(query_ids_file_order, identifier)
-            push!(queries, path_numbers)
-            found == length(query_ids) && break
-        end
+        push!(query_ids_file_order, identifier)
+        push!(queries, path_numbers)
     end
+
+    # found = 0
+    # queries = Vector{Vector{Int32}}()
+    # query_ids_file_order = OrderedSet{String}() # Might find in different order in the file than query_ids
+    # for (i, line) in enumerate(eachline(f))
+    #     identifier, path = split(line, "\t")
+    #     if identifier in query_ids
+    #         write(q_paths_out, line)
+    #         found +=1
+    #         path_numbers = parse_numbers(path)
+    #         push!(query_ids_file_order, identifier)
+    #         push!(queries, path_numbers)
+    #         found == length(query_ids) && break
+    #     end
+    # end
     return queries, query_ids_file_order
 end
 
@@ -42,16 +51,22 @@ function read_node_sizes(f::String)
 end
 
 function read_ids_from_file(f::String, first_n::Int64)
+function read_ids_from_file(f::String, first_n::Int64)
     ids = OrderedSet{String}()
     for (i, line) in enumerate(eachline(f))
+    for (i, line) in enumerate(eachline(f))
         push!(ids, strip(line))
+        first_n > 0 && i == (first_n-1) && break 
         first_n > 0 && i == (first_n-1) && break 
     end
     return ids
 end
 
 function processGFA(gfa::String, query_file::String; first_n = -1)
+function processGFA(gfa::String, query_file::String; first_n = -1)
     # Read the query ids from the file 
+    query_ids = read_ids_from_file(query_file, first_n)
+    # Get the first X if specified (handy for testing)
     query_ids = read_ids_from_file(query_file, first_n)
     # Get the first X if specified (handy for testing)
     queries, query_ids = read_queries(gfa, query_ids)
