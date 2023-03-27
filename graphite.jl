@@ -49,19 +49,19 @@ function update_color!(color::Color, ref_id::Int32, match_start::Int32, match_si
     at_end   = color.origin[match_end]
 
     if at_start.id > 0 && at_start.id == at_end.id && at_start.pos == at_end.pos
-        println("COLOR_UPDATE: Max already")
+        #println("COLOR_UPDATE: Max already")
         return
     # Don't have to bother about single node matches as they can't be longer anyway
     elseif match_start ==  match_end && color.len[match_start] > 0
-        println("COLOR_UPDATE: Single max already")
+       # println("COLOR_UPDATE: Single max already")
         return
     else
         
         match_size_nt =  get_match_size(color, ca, match_start, match_size) #sum(get.(Ref(color.size_map), view(ca, match_start:match_end), 0))
         # We have to consider to overlap between k-mers as well 
         
-        println("COLOR_UPDATE: adding size: ", match_size_nt)
-        @turbo for i in match_start:match_end
+        #println("COLOR_UPDATE: adding size: ", match_size_nt)
+        @simd @inbounds for i in match_start:match_end
             if color.len[i] < match_size_nt 
                 color.len[i]  = match_size_nt
                 color.origin[i] = Origin(ref_id, match_start)
@@ -119,11 +119,15 @@ function check_this_point(ca::Vector{Int32}, sa::Vector{Int32}, ref::AbstractVec
 end
 
 function extend_from_point!(ca::Vector{Int32}, sa::Vector{Int32}, ref::Vector{Int32}, lcp::Vector{Int32}, point::Int32, forward::Bool, ref_start::Int32, match_size::Int32, ref_id::Int32, color::Color)
+    
+    moves = 0
+    
     move_dir = forward ? 1 : -1
     lcp_dir  = forward ? 0 :  1
    # println("Extending this point")
     i = point += move_dir
     while i > 1 && i <= length(sa) && lcp[i + lcp_dir] > 0
+        moves +=1
         # We can skip the LCP part when extending, note though we also have to 
         # check the previous match size so min(lcp valu, prev match size)
         start_check_from = Int32(min(lcp[i + lcp_dir], match_size))
@@ -132,6 +136,7 @@ function extend_from_point!(ca::Vector{Int32}, sa::Vector{Int32}, ref::Vector{In
         update_color!(color, ref_id, sa[i], Int32(match_size), ca)
         i += move_dir        
     end
+    return match_size, moves
 end
 
 function align(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}, ref::Vector{Int32}, inv_perm_sa::Vector{Int32}, lcp::Vector{Int32})
@@ -139,10 +144,19 @@ function align(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}
     max_match_index = Int32(0)
     max_match_size = Int32(0)
     ref_start = Int32(1)
+
+    # Keep track of some stats 
+    bin_searches = 0
+    nodes_updated = 0
+    tot_moves = 0
+
     while ref_start <= length(ref)
 
         # Do binary search to locate the insert point
-        println("Binary searching")
+        #println("Binary searching")
+
+        bin_searches += 1 
+
         insert_point = locate_insert_point(sa, ca, view(ref, ref_start:length(ref)))
         max_match_index, max_match_size = decide_on_seed(insert_point, ca, sa, ref, ref_start)
 
@@ -158,10 +172,15 @@ function align(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}
                 #update_color!(color, ref_id, sa[max_match_index], Int32(max_match_size), ca)
                               
                 # Check up and down in suffix array for other matches
-                extend_from_point!(ca, sa, ref, lcp, max_match_index, false, ref_start, Int32(max_match_size), ref_id, color)
-                extend_from_point!(ca, sa, ref, lcp, max_match_index, true, ref_start, Int32(max_match_size), ref_id, color)
+                updates, moves =  extend_from_point!(ca, sa, ref, lcp, max_match_index, false, ref_start, Int32(max_match_size), ref_id, color)
+                nodes_updated += updates
+                tot_moves += moves
 
-                # # Move to next location in suffix array for the second around
+                updates, moves = extend_from_point!(ca, sa, ref, lcp, max_match_index, true, ref_start, Int32(max_match_size), ref_id, color)
+                nodes_updated += updates
+                tot_moves += moves
+
+                # Move to next location in suffix array for the second around
                 max_match_index = inv_perm_sa[sa[max_match_index]+1]
                 ref_start += Int32(1)
             end 
@@ -170,6 +189,12 @@ function align(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}
             ref_start += Int32(1)
         end
     end
+
+    println("Stats for: ", ref_id)
+    println("Bin searches: ", bin_searches)
+    println("Nodes updated: ", nodes_updated)
+    println("Moves: ", tot_moves)
+
 end
 
 function align_forward_and_reverse(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}, ref::Vector{Int32}, inv_perm_sa::Vector{Int32}, lcp::Vector{Int32})
