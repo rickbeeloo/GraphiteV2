@@ -112,13 +112,14 @@ function check_this_point(ca::Vector{Int32}, sa::Vector{Int32}, ref::AbstractVec
     #println("Checking suffix: ", view(ref, ref_start:length(ref)))
     ref_start = ref_start + skip
     match_size = matches_till(ref, ref_start, ca, ca_start) + skip
-    return match_size
+    return match_size, match_size - ref_start
 end
 
 function extend_from_point!(ca::Vector{Int32}, sa::Vector{Int32}, ref::Vector{Int32}, lcp::Vector{Int32}, point::Int32, forward::Bool, ref_start::Int32, match_size::Int32, ref_id::Int32, color::Color)
     
-    moves = 0
-
+    moves = 0 
+    checks = 0
+    
     move_dir = forward ? 1 : -1
     lcp_dir  = forward ? 0 :  1
     i = point += move_dir
@@ -129,11 +130,12 @@ function extend_from_point!(ca::Vector{Int32}, sa::Vector{Int32}, ref::Vector{In
         # check the previous match size so min(lcp valu, prev match size)
         start_check_from = Int32(min(lcp[i + lcp_dir], match_size))
         # Check the size of this match starting from +1 of the LCP value)
-        match_size = check_this_point(ca, sa, ref, ref_start, Int32(i), start_check_from)
+        match_size, actual_checks = check_this_point(ca, sa, ref, ref_start, Int32(i), start_check_from)
+        checks += actual_checks
         update_color!(color, ref_id, sa[i], Int32(match_size), ca)
         i += move_dir        
     end
-    return match_size, moves
+    return match_size, moves, checks
 end
 
 function align(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}, ref::Vector{Int32}, inv_perm_sa::Vector{Int32}, lcp::Vector{Int32})
@@ -146,10 +148,12 @@ function align(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}
     bin_searches = 0
     nodes_updated = 0
     tot_moves = 0
+    tot_checks = 0
 
     while ref_start <= length(ref)
 
         bin_searches += 1 
+        
 
         insert_point = locate_insert_point(sa, ca, view(ref, ref_start:length(ref)))
         max_match_index, max_match_size = decide_on_seed(insert_point, ca, sa, ref, ref_start)
@@ -164,13 +168,15 @@ function align(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}
                 # If we don't have any match we don't have to check the flanks
                 max_match_size == 0 && break 
 
-                updates, moves = extend_from_point!(ca, sa, ref, lcp, max_match_index, true, ref_start, Int32(max_match_size), ref_id, color)
+                updates, moves, checks = extend_from_point!(ca, sa, ref, lcp, max_match_index, true, ref_start, Int32(max_match_size), ref_id, color)
                 nodes_updated += updates
                 tot_moves += moves
+                tot_checks += checks
 
-                updates, moves =  extend_from_point!(ca, sa, ref, lcp, max_match_index, false, ref_start, Int32(max_match_size), ref_id, color)
+                updates, moves, checks =  extend_from_point!(ca, sa, ref, lcp, max_match_index, false, ref_start, Int32(max_match_size), ref_id, color)
                 nodes_updated += updates
                 tot_moves += moves
+                tot_checks += checks
 
                 # Move to next location in suffix array for the second around
                 max_match_index = inv_perm_sa[sa[max_match_index]+1]
@@ -186,6 +192,7 @@ function align(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}
     println("Bin searches: ", bin_searches)
     println("Nodes updated: ", nodes_updated)
     println("Moves: ", tot_moves)
+    println("Checks: ", tot_checks)
 
 end
 

@@ -11,34 +11,34 @@ end
 function read_queries(f::String, query_ids::OrderedSet{String})
 
     # For later to speed up testing 
-    q_paths_out = open("../query_paths.txt", "w+")
+    q_paths = open("../query_paths.txt", "r")
 
     #queries = Vector{Vector{Int32}}()
     #query_ids_file_order = OrderedSet{String}()
 
-    # for line in eachline(q_paths)
-    #     identifier, path = split(line, "\t")
-    #     path_numbers = parse_numbers(path)
-    #     push!(query_ids_file_order, identifier)
-    #     push!(queries, path_numbers)
-    # end
-
-    found = 0
-    queries = Vector{Vector{Int32}}()
-    query_ids_file_order = OrderedSet{String}() # Might find in different order in the file than query_ids
-    for (i, line) in enumerate(eachline(f))
+    for line in eachline(q_paths)
         identifier, path = split(line, "\t")
-        if identifier in query_ids
-            write(q_paths_out, line)
-            found +=1
-            path_numbers = parse_numbers(path)
-            push!(query_ids_file_order, identifier)
-            push!(queries, path_numbers)
-            found == length(query_ids) && break
-        end
+        path_numbers = parse_numbers(path)
+        push!(query_ids_file_order, identifier)
+        push!(queries, path_numbers)
     end
 
-    println("Done reading queires, read: ", length(queries))
+    # found = 0
+    # queries = Vector{Vector{Int32}}()
+    # query_ids_file_order = OrderedSet{String}() # Might find in different order in the file than query_ids
+    # for (i, line) in enumerate(eachline(f))
+    #     identifier, path = split(line, "\t")
+    #     if identifier in query_ids
+    #         println(q_paths_out, line)
+    #         found +=1
+    #         path_numbers = parse_numbers(path)
+    #         push!(query_ids_file_order, identifier)
+    #         push!(queries, path_numbers)
+    #         found == length(query_ids) && break
+    #     end
+    # end
+
+    println("Done reading queries, read: ", length(queries))
     return queries, query_ids_file_order
 end
 
