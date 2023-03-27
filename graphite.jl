@@ -34,7 +34,7 @@ function get_match_size(color::Color, ca::Vector{Int32}, match_start::Int32, mat
     for i in match_start:match_end
         match_size_nt += get(color.size_map, ca[i], 0)
     end
-    println("MS: ", match_size)
+    # println("MS: ", match_size)
     match_size_nt = match_size_nt - ((match_size-1) * (color.k_size-1)) 
     return match_size_nt
 end
