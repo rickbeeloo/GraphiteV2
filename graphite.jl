@@ -82,11 +82,11 @@ end
 # Check left and right from insert point to see if we have a match
 function decide_on_seed(insert_point::Int32, ca::Vector{Int32}, sa::Vector{Int32}, ref::AbstractVector{Int32}, ref_start::Int32)
     # Check left for a match
-    left_of_ip = insert_point > 1 ? check_this_point(ca, sa, view(ref, ref_start:length(ref)), Int32(1), insert_point-Int32(1),  Int32(0)) : 0 
+    left_of_ip = insert_point > 1 ? check_this_point(ca, sa, view(ref, ref_start:length(ref)), Int32(1), insert_point-Int32(1),  Int32(0))[1] : 0 
     left_of_ip > 0 && return insert_point-Int32(1), Int32(left_of_ip)
 
     # Check right for a match, no need to check if it's outside the bounds of the SA <= length(sa)
-    right_of_ip = insert_point <= length(sa) ? check_this_point(ca, sa, view(ref, ref_start:length(ref)), Int32(1), insert_point, Int32(0)) : 0
+    right_of_ip = insert_point <= length(sa) ? check_this_point(ca, sa, view(ref, ref_start:length(ref)), Int32(1), insert_point, Int32(0))[1] : 0
     right_of_ip > 0 && return insert_point, Int32(right_of_ip)
 
     # Neither actually matches our Ref, return 0,0 to move on to the next one
@@ -112,7 +112,7 @@ function check_this_point(ca::Vector{Int32}, sa::Vector{Int32}, ref::AbstractVec
     #println("Checking suffix: ", view(ref, ref_start:length(ref)))
     ref_start = ref_start + skip
     match_size = matches_till(ref, ref_start, ca, ca_start) + skip
-    return match_size, match_size - ref_start
+    return match_size, match_size - skip
 end
 
 function extend_from_point!(ca::Vector{Int32}, sa::Vector{Int32}, ref::Vector{Int32}, lcp::Vector{Int32}, point::Int32, forward::Bool, ref_start::Int32, match_size::Int32, ref_id::Int32, color::Color)
@@ -163,7 +163,7 @@ function align(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}
             while ref_start <= length(ref)
                 
                 # Check the match size at this point 
-                max_match_size = check_this_point(ca, sa, ref, ref_start, max_match_index, Int32(max_match_size)-Int32(1)) # skip k-1
+                max_match_size, _ = check_this_point(ca, sa, ref, ref_start, max_match_index, Int32(max_match_size)-Int32(1)) # skip k-1
                                 
                 # If we don't have any match we don't have to check the flanks
                 max_match_size == 0 && break 
