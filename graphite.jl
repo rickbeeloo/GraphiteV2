@@ -124,17 +124,25 @@ function extend_from_point!(ca::Vector{Int32}, sa::Vector{Int32}, ref::Vector{In
     lcp_dir  = forward ? 0 :  1
     i = point += move_dir
 
+    println("Extending for: ", ref_id, " from position: ", ref_start)
     while i > 1 && i <= length(sa) && lcp[i + lcp_dir] > 0
         moves += 1
         # We can skip the LCP part when extending, note though we also have to 
         # check the previous match size so min(lcp valu, prev match size)
         start_check_from = Int32(min(lcp[i + lcp_dir], match_size))
+        #println("Checking in SA at: ", i," with skip of: ", start_check_from )
         # Check the size of this match starting from +1 of the LCP value)
+        #println("-- Suff: ", view(ref, ref_start:ref_start+20))
         match_size, actual_checks = check_this_point(ca, sa, ref, ref_start, Int32(i), start_check_from)
+        println("Checking in SA at: ", i," with skip of: ", start_check_from, " matched: ", match_size, " checks done: ", actual_checks)
         checks += actual_checks
         update_color!(color, ref_id, sa[i], Int32(match_size), ca)
-        i += move_dir        
+        i += move_dir     
+        println("Condition checks")
+        println(i <= length(sa))
+        println(lcp[i + lcp_dir] > 0)   
     end
+    println()
     return match_size, moves, checks
 end
 
@@ -153,26 +161,29 @@ function align(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}
     while ref_start <= length(ref)
 
         bin_searches += 1 
+        println("Doing binary search again")
         
-
         insert_point = locate_insert_point(sa, ca, view(ref, ref_start:length(ref)))
         max_match_index, max_match_size = decide_on_seed(insert_point, ca, sa, ref, ref_start)
 
         # If we have a match keep using the linked list to extend 
         if max_match_size > 0 
             while ref_start <= length(ref)
+                println("Working at ref position: ", ref_start)
                 
                 # Check the match size at this point 
                 max_match_size, _ = check_this_point(ca, sa, ref, ref_start, max_match_index, Int32(max_match_size)-Int32(1)) # skip k-1
                                 
                 # If we don't have any match we don't have to check the flanks
                 max_match_size == 0 && break 
-
+                
+                println("> Forward")
                 updates, moves, checks = extend_from_point!(ca, sa, ref, lcp, max_match_index, true, ref_start, Int32(max_match_size), ref_id, color)
                 nodes_updated += updates
                 tot_moves += moves
                 tot_checks += checks
-
+                
+                println("> Backward")
                 updates, moves, checks =  extend_from_point!(ca, sa, ref, lcp, max_match_index, false, ref_start, Int32(max_match_size), ref_id, color)
                 nodes_updated += updates
                 tot_moves += moves
@@ -193,6 +204,7 @@ function align(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}
     println("Nodes updated: ", nodes_updated)
     println("Moves: ", tot_moves)
     println("Checks: ", tot_checks)
+    println()
 
 end
 
@@ -206,8 +218,7 @@ function align_forward_and_reverse(ref_id::Int32, color::Color, ca::Vector{Int32
     reverse_complement_ref!(ref)
     println("> Reverse")
     @time align(ref_id, color, ca, sa, ref, inv_perm_sa,lcp)
-    println()
-    
+    println()  
 end
 
 function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, out_file::String; blacklist::String = "") 
@@ -241,13 +252,16 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
     p = Progress(limit)
     println("Start aligning...")
     for (ref_id, line) in enumerate(eachline(gfa))
-       identifier, path = split(line, "\t")
-       ref_id == limit && break
-       if !(identifier in query_ids) && !(identifier in blacklist_ids)
-           path_numbers = parse_numbers(path)
-           align_forward_and_reverse(Int32(ref_id), color, ca, sa, path_numbers, inv_sa_perm, lcp)
-           next!(p)
-      end
+        if ref_id == 370
+            println("Got the ref")
+            identifier, path = split(line, "\t")
+            ref_id == limit && break
+            if !(identifier in query_ids) && !(identifier in blacklist_ids)
+                path_numbers = parse_numbers(path)
+                align_forward_and_reverse(Int32(ref_id), color, ca, sa, path_numbers, inv_sa_perm, lcp)
+                next!(p)
+            end
+        end
     end
 
     #writeResults(ca, color, query_ids, out_file, size_map)
