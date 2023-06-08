@@ -18,30 +18,11 @@ struct Color
     k_size::Int32
 end
 
-function update_color!(color::Color, ref_id::Int32, match_start::Int32, match_size::Int32, ca::Vector{Int32})
-    
-    match_end = match_start+match_size-1
-    
-    # Get info from pervious matches
-    at_start = color.origin[match_start]
-    at_end   = color.origin[match_end]
-
-    if at_start.id > 0 && at_start.id == at_end.id && at_start.pos == at_end.pos
-        return
-    # Don't have to bother about single node matches as they can't be longer anyway
-    elseif match_start ==  match_end && color.len[match_start] > 0
-        return
-    else
-        match_size_nt = sum(get.(Ref(color.size_map), view(ca, match_start:match_end), 0))
-        # We have to consider to overlap between k-mers as well 
-        match_size_nt = match_size_nt - ((match_size-1) * (color.k_size-1)) 
-        for i in match_start:match_end
-            if color.len[i] < match_size_nt 
-                color.len[i]  = match_size_nt
-                color.origin[i] = Origin(ref_id, match_start)
-            end
-        end
-    end
+function update_color!(tree::treeType, ref_id::Int32, match_start::Int32, match_size::Int32, ca::Vector{Int32}, size_map::Dict{Int32, Int32})
+    match_end = match_start+match_size-Int32(1)
+    match_size_nt = sum(get.(Ref(size_map), view(ca, match_start:match_end), 0))
+    match_size_nt > 10 || return
+    color!(tree, (match_start, match_end), ref_id, match_size)
 end
 
 function reverse_complement_ref!(ref::Vector{Int32})
@@ -91,7 +72,7 @@ function check_this_point(ca::Vector{Int32}, sa::Vector{Int32}, ref::AbstractVec
     return match_size
 end
 
-function extend_from_point!(ca::Vector{Int32}, sa::Vector{Int32}, ref::Vector{Int32}, lcp::Vector{Int32}, point::Int32, forward::Bool, ref_start::Int32, match_size::Int32, ref_id::Int32, color::Color)
+function extend_from_point!(ca::Vector{Int32}, sa::Vector{Int32}, ref::Vector{Int32}, lcp::Vector{Int32}, point::Int32, forward::Bool, ref_start::Int32, match_size::Int32, ref_id::Int32, tree::treeType, size_map::Dict{Int32, Int32})
     move_dir = forward ? 1 : -1
     lcp_dir  = forward ? 0 :  1
    # println("Extending this point")
@@ -102,12 +83,12 @@ function extend_from_point!(ca::Vector{Int32}, sa::Vector{Int32}, ref::Vector{In
         start_check_from = Int32(min(lcp[i + lcp_dir], match_size))
         # Check the size of this match starting from +1 of the LCP value)
         match_size = check_this_point(ca, sa, ref, ref_start, Int32(i), start_check_from )
-        update_color!(color, ref_id, sa[i], Int32(match_size), ca)
+        update_color!(tree, ref_id, sa[i], Int32(match_size), ca, size_map)
         i += move_dir        
     end
 end
 
-function align(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}, ref::Vector{Int32}, inv_perm_sa::Vector{Int32}, lcp::Vector{Int32})
+function align(ref_id::Int32, tree::treeType, ca::Vector{Int32}, sa::Vector{Int32}, ref::Vector{Int32}, inv_perm_sa::Vector{Int32}, lcp::Vector{Int32}, size_map::Dict{Int32, Int32})
    # println(ref_id, " at: ", ref[307])
     max_match_index = Int32(0)
     max_match_size = Int32(0)
@@ -126,11 +107,11 @@ function align(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}
                 
                 # If we don't have any match we don't have to check the flanks
                 max_match_size == 0 && break 
-                update_color!(color, ref_id, sa[max_match_index], Int32(max_match_size), ca)
+                update_color!(tree, ref_id, sa[max_match_index], Int32(max_match_size), ca, size_map)
                               
                 # Check up and down in suffix array for other matches
-                extend_from_point!(ca, sa, ref, lcp, max_match_index, false, ref_start, Int32(max_match_size), ref_id, color)
-                extend_from_point!(ca, sa, ref, lcp, max_match_index, true, ref_start, Int32(max_match_size), ref_id, color)
+                extend_from_point!(ca, sa, ref, lcp, max_match_index, false, ref_start, Int32(max_match_size), ref_id, tree, size_map)
+                extend_from_point!(ca, sa, ref, lcp, max_match_index, true, ref_start, Int32(max_match_size), ref_id, tree, size_map)
 
                 # # Move to next location in suffix array for the second around
                 max_match_index = inv_perm_sa[sa[max_match_index]+1]
@@ -143,12 +124,12 @@ function align(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}
     end
 end
 
-function align_forward_and_reverse(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}, ref::Vector{Int32}, inv_perm_sa::Vector{Int32}, lcp::Vector{Int32})
+function align_forward_and_reverse(ref_id::Int32, tree::treeType, ca::Vector{Int32}, sa::Vector{Int32}, ref::Vector{Int32}, inv_perm_sa::Vector{Int32}, lcp::Vector{Int32}, size_map::Dict{Int32, Int32})
     # First do the forward align 
-    align(ref_id, color, ca, sa, ref, inv_perm_sa,lcp)
+    align(ref_id, tree, ca, sa, ref, inv_perm_sa,lcp, size_map)
     # Flip the nodes and reverse to do the reverse alignment 
     reverse_complement_ref!(ref)
-    align(ref_id, color, ca, sa, ref, inv_perm_sa,lcp)
+    align(ref_id, tree, ca, sa, ref, inv_perm_sa,lcp, size_map)
 end
 
 function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, out_file::String; blacklist::String = "") 
@@ -165,17 +146,19 @@ function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, o
     size_map = read_node_sizes(seq_file)
     len = zeros(Int32, length(ca))
     ori =  [Origin(-1,-1) for i in 1:length(ca)] # Vector{Origin}(undef, length(ca)) 
-    color = Color(len, ori, size_map, k_size)
+    #color = Color(len, ori, size_map, k_size)
+
+    tree = IntervalMap{Int32, genomeLocation}()
 
     for (ref_id, line) in enumerate(eachline(gfa))
        identifier, path = split(line, "\t")
        if !(identifier in query_ids) && !(identifier in blacklist_ids)
            path_numbers = parse_numbers(path)
-           align_forward_and_reverse(Int32(ref_id), color, ca, sa, path_numbers, inv_sa_perm, lcp)
+           align_forward_and_reverse(Int32(ref_id), tree, ca, sa, path_numbers, inv_sa_perm, lcp, size_map)
        end
     end
 
-    writeResults(ca, color, query_ids, out_file, size_map)
+    #writeResults(ca, color, query_ids, out_file, size_map)
 
 end
 

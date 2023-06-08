@@ -1,9 +1,12 @@
 using OrderedCollections
 using ArgParse
+using IntervalTrees
 
+include("./flastIntervalTree.jl")
 include("./graphite.jl")
 include("./graph_io.jl")
 include("./suffixArray.jl")
+
 
 # Function to parse command line options
 function parse_commandline()

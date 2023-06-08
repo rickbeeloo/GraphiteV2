@@ -8,6 +8,7 @@ function parse_numbers(path::AbstractString)
     return numbers
 end
 
+
 function read_queries(f::String, query_ids::OrderedSet{String})
     queries = Vector{Vector{Int32}}()
     query_ids_file_order = OrderedSet{String}() # Might find in different order in the file than query_ids
