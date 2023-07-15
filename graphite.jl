@@ -1,3 +1,6 @@
+using ProgressMeter
+using Dates 
+
 const MASK = Int32(1<<30) 
 
 flipnode(n::Int32) = n ⊻ MASK
@@ -18,9 +21,23 @@ struct Color
     k_size::Int32
 end
 
-function update_color!(color::Color, ref_id::Int32, match_start::Int32, match_size::Int32, ca::Vector{Int32})
+# 175378
+# 175378
+function update_color!(color::Color, ref_id::Int32, match_start::Int32, match_size::Int32, ca::Vector{Int32}, ca_coords::UnitRange{Int32})
     
     match_end = match_start+match_size-1
+    println("Got match: ", match_start, " -> ", match_end)
+    # Check if this is masked as query 
+    # println( ca_coords[1] != Int32(0))
+    # println(match_start >= ca_coords[1])
+    # println(match_end <= ca_coords[2], " ", match_end, " and ", ca_coords[2] )
+    # println(ca_coords)
+    if ca_coords[1] != Int32(0) && match_start >= ca_coords.start && match_end <= ca_coords.stop
+       # println("Same as query skip")
+        return 
+    end
+ 
+    # println("Passed as non query")
     
     # Get info from pervious matches
     at_start = color.origin[match_start]
@@ -91,7 +108,7 @@ function check_this_point(ca::Vector{Int32}, sa::Vector{Int32}, ref::AbstractVec
     return match_size
 end
 
-function extend_from_point!(ca::Vector{Int32}, sa::Vector{Int32}, ref::Vector{Int32}, lcp::Vector{Int32}, point::Int32, forward::Bool, ref_start::Int32, match_size::Int32, ref_id::Int32, color::Color)
+function extend_from_point!(ca::Vector{Int32}, sa::Vector{Int32}, ref::Vector{Int32}, lcp::Vector{Int32}, point::Int32, forward::Bool, ref_start::Int32, match_size::Int32, ref_id::Int32, color::Color, ca_coords::UnitRange{Int32})
     move_dir = forward ? 1 : -1
     lcp_dir  = forward ? 0 :  1
    # println("Extending this point")
@@ -102,12 +119,12 @@ function extend_from_point!(ca::Vector{Int32}, sa::Vector{Int32}, ref::Vector{In
         start_check_from = Int32(min(lcp[i + lcp_dir], match_size))
         # Check the size of this match starting from +1 of the LCP value)
         match_size = check_this_point(ca, sa, ref, ref_start, Int32(i), start_check_from )
-        update_color!(color, ref_id, sa[i], Int32(match_size), ca)
+        update_color!(color, ref_id, sa[i], Int32(match_size), ca, ca_coords)
         i += move_dir        
     end
 end
 
-function align(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}, ref::Vector{Int32}, inv_perm_sa::Vector{Int32}, lcp::Vector{Int32})
+function align(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}, ref::Vector{Int32}, inv_perm_sa::Vector{Int32}, lcp::Vector{Int32}, ca_coords::UnitRange{Int32})
    # println(ref_id, " at: ", ref[307])
     max_match_index = Int32(0)
     max_match_size = Int32(0)
@@ -121,16 +138,16 @@ function align(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}
         # If we have a match keep using the linked list to extend 
         if max_match_size > 0 
             while ref_start <= length(ref)
-                       # Check the match size at this point 
+                # Check the match size at this point 
                 max_match_size = check_this_point(ca, sa, ref, ref_start, max_match_index, Int32(max_match_size-1)) # skip k-1
                 
                 # If we don't have any match we don't have to check the flanks
                 max_match_size == 0 && break 
-                update_color!(color, ref_id, sa[max_match_index], Int32(max_match_size), ca)
+                update_color!(color, ref_id, sa[max_match_index], Int32(max_match_size), ca, ca_coords)
                               
                 # Check up and down in suffix array for other matches
-                extend_from_point!(ca, sa, ref, lcp, max_match_index, false, ref_start, Int32(max_match_size), ref_id, color)
-                extend_from_point!(ca, sa, ref, lcp, max_match_index, true, ref_start, Int32(max_match_size), ref_id, color)
+                extend_from_point!(ca, sa, ref, lcp, max_match_index, false, ref_start, Int32(max_match_size), ref_id, color, ca_coords)
+                extend_from_point!(ca, sa, ref, lcp, max_match_index, true, ref_start, Int32(max_match_size), ref_id, color, ca_coords)
 
                 # # Move to next location in suffix array for the second around
                 max_match_index = inv_perm_sa[sa[max_match_index]+1]
@@ -143,40 +160,60 @@ function align(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}
     end
 end
 
-function align_forward_and_reverse(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}, ref::Vector{Int32}, inv_perm_sa::Vector{Int32}, lcp::Vector{Int32})
+function align_forward_and_reverse(ref_id::Int32, color::Color, ca::Vector{Int32}, sa::Vector{Int32}, ref::Vector{Int32}, inv_perm_sa::Vector{Int32}, lcp::Vector{Int32}, ca_coords::UnitRange{Int32})
     # First do the forward align 
-    align(ref_id, color, ca, sa, ref, inv_perm_sa,lcp)
+    align(ref_id, color, ca, sa, ref, inv_perm_sa,lcp, ca_coords)
     # Flip the nodes and reverse to do the reverse alignment 
     reverse_complement_ref!(ref)
-    align(ref_id, color, ca, sa, ref, inv_perm_sa,lcp)
+    align(ref_id, color, ca, sa, ref, inv_perm_sa,lcp, ca_coords)
 end
 
 function run(gfa::String, seq_file::String, query_file::String, k_size::Int32, out_file::String; blacklist::String = "") 
-    
+    start_time = now()
     blacklist_ids = !isempty(blacklist) ? read_ids_from_file(blacklist) : OrderedSet{String}()
 
-    queries, query_ids = processGFA(gfa, query_file)
-       
-    ca, sa = create_k_suffix_array(queries, Int32(0))
+    println("Reading GFA...")
+    queries, query_ids, query_ids_numerical = processGFA(gfa, query_file)
+    
+    println("Building data structures (SA, LCP, and ISA")
+    ca, query_offsets, sa = create_k_suffix_array(queries, query_ids_numerical, Int32(0))
     inv_sa_perm = inverse_perm_sa(sa)
     lcp = build_lcp(sa, ca)
 
-  
+    println("Reading node sizes...")
     size_map = read_node_sizes(seq_file)
     len = zeros(Int32, length(ca))
     ori =  [Origin(-1,-1) for i in 1:length(ca)] # Vector{Origin}(undef, length(ca)) 
     color = Color(len, ori, size_map, k_size)
+    println("Aligning references to the suffix array")
+
+    prog = ProgressUnknown("References read: ")
 
     for (ref_id, line) in enumerate(eachline(gfa))
-       identifier, path = split(line, "\t")
-       if !(identifier in query_ids) && !(identifier in blacklist_ids)
-           path_numbers = parse_numbers(path)
-           align_forward_and_reverse(Int32(ref_id), color, ca, sa, path_numbers, inv_sa_perm, lcp)
-       end
+        identifier, path = split(line, "\t")
+        # Skip if blacklisted
+        identifier in blacklist_ids && continue
+        # Get the mask coordinates in the CA array if this is a query 
+        ca_coords = identifier in query_ids ? query_offsets[ref_id] : Int32(0):Int32(0)
+        #if ca_coords[1] != Int32(0)
+            #println("Got coords: ", ca_coords, "id: ", identifier, " ref id: ", ref_id)
+            
+        path_numbers = parse_numbers(path)
+        align_forward_and_reverse(Int32(ref_id), color, ca, sa, path_numbers, inv_sa_perm, lcp, ca_coords)
+        println(ca_coords)
+
+        
+       # end
+        
+
+        
+        ProgressMeter.next!(prog)
+       
     end
-
+    ProgressMeter.finish!(prog)
+    println("Writing output")
     writeResults(ca, color, query_ids, out_file, size_map)
-
+    println("Elapsed: ", now() - start_time)
 end
 
 # run("test", "test", "test", Int32(31), "test")

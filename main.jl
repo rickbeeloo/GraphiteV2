@@ -1,5 +1,6 @@
 using OrderedCollections
 using ArgParse
+using IntervalTrees
 
 include("./graphite.jl")
 include("./graph_io.jl")
