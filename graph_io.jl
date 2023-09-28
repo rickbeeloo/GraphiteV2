@@ -11,15 +11,19 @@ end
 function read_queries(f::String, query_ids::OrderedSet{String})
     queries = Vector{Vector{Int32}}()
     query_ids_file_order = OrderedSet{String}() # Might find in different order in the file than query_ids
+    query_ids_numerical = Vector{Int32}()
     for (i, line) in enumerate(eachline(f))
         identifier, path = split(line, "\t")
         if identifier in query_ids
             path_numbers = parse_numbers(path)
             push!(query_ids_file_order, identifier)
             push!(queries, path_numbers)
+            push!(query_ids_numerical, i)
+            length(query_ids) == length(query_ids_file_order) && break
         end
     end
-    return queries, query_ids_file_order
+    println("Read: ", length(query_ids_file_order), " queries")
+    return queries, query_ids_file_order, query_ids_numerical
 end
 
 function read_node_sizes(f::String)
@@ -44,8 +48,8 @@ end
 function processGFA(gfa::String, query_file::String)
     # Read the query ids from the file 
     query_ids = read_ids_from_file(query_file)
-    queries, query_ids = read_queries(gfa, query_ids)
-    return queries, query_ids
+    queries, query_ids, query_ids_numerical = read_queries(gfa, query_ids)
+    return queries, query_ids, query_ids_numerical
 end
 
 function writeResults(ca::Vector{Int32}, color::Color, query_ids::OrderedSet{String}, out_file::String, size_map::Dict{Int32, Int32})
